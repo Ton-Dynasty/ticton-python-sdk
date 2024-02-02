@@ -27,6 +27,18 @@ This is the Python SDK for Tic Ton Oracle on TON blockchain, which is a pure dec
     make install
     ```
 
+4. Start your virtual environment
+
+    ```bash
+    poetry shell
+    ```
+
+5. Run tests
+
+    ```bash
+    poetry run pytest
+    ```
+
 ## Publish Guide
 
 1. Update version in `pyproject.toml`
