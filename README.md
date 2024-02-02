@@ -15,7 +15,13 @@ This is the Python SDK for Tic Ton Oracle on TON blockchain, which is a pure dec
     curl -sSL https://install.python-poetry.org | python3 -
     ```
 
-2. Install dependencies
+2. Install plugin for poetry
+
+    ``` bash
+    poetry self add poetry-bumpversion
+    ```
+
+3. Install dependencies
 
     ```bash
     make install
