@@ -6,6 +6,8 @@ from tonsdk.boc import begin_cell, Cell
 import aiohttp
 import json
 from typing import Dict
+
+from tonsdk.utils import Address
 from tonpy import CellSlice
 
 __all__ = ["TonCenterClient", "ToncenterWrongResult"]
@@ -78,7 +80,9 @@ class TonCenterClient:
         request_stack = [
             [
                 "tvm.Slice",
-                base64.b64encode(begin_cell().store_address(account_address).end_cell().to_boc()).decode(),
+                base64.b64encode(
+                    begin_cell().store_address(account_address).end_cell().to_boc()
+                ).decode(),
             ]
         ]
         # get jetton wallet address from master address
@@ -87,11 +91,18 @@ class TonCenterClient:
             method="get_wallet_address",
             stack=request_stack,
         )
-        jetton_wallet_address = Cell.one_from_boc(base64.b64decode(stack["bytes"])).begin_parse().read_msg_addr().to_string(True, True, True)
+        jetton_wallet_address = (
+            Cell.one_from_boc(base64.b64decode(stack["bytes"]))
+            .begin_parse()
+            .read_msg_addr()
+            .to_string(True, True, True)
+        )
         return jetton_wallet_address
 
     async def get_token_balance(self, master_address, account_address):
-        jetton_wallet_address = await self.get_jetton_wallet(master_address, account_address)
+        jetton_wallet_address = await self.get_jetton_wallet(
+            master_address, account_address
+        )
         # get token balance from jetton wallet address
         req = {
             "func": self.__jsonrpc_request,
@@ -110,7 +121,9 @@ class TonCenterClient:
         return result["state"]
 
     async def get_alarm_address(self, oracle, alarm_id):
-        result = await self.run_get_method(oracle, "getAlarmAddress", [["num", alarm_id]])
+        result = await self.run_get_method(
+            oracle, "getAlarmAddress", [["num", alarm_id]]
+        )
         address_bytes = result["bytes"]
         cs = CellSlice(address_bytes)
         address = cs.load_address()
@@ -123,9 +136,13 @@ class TonCenterClient:
             "getRemainScale",
             "getBaseAssetPrice",
         ]
-        tasks = [self.run_get_method(alarm_address, method, []) for method in get_methods]
+        tasks = [
+            self.run_get_method(alarm_address, method, []) for method in get_methods
+        ]
         results = await asyncio.gather(*tasks)
-        base_asset_scale, quote_asset_scale, remain_scale, base_asset_price = [int(result, 16) for result in results]
+        base_asset_scale, quote_asset_scale, remain_scale, base_asset_price = [
+            int(result, 16) for result in results
+        ]
         return {
             "base_asset_scale": base_asset_scale,
             "quote_asset_scale": quote_asset_scale,
@@ -145,10 +162,14 @@ class TonCenterClient:
             return await func(session, *args, **kwargs)
 
     async def __post_request(self, session, url, data):
-        async with session.post(url, data=json.dumps(data), headers=self.__headers()) as resp:
+        async with session.post(
+            url, data=json.dumps(data), headers=self.__headers()
+        ) as resp:
             return await self.__parse_response(resp)
 
-    async def __jsonrpc_request(self, session, method: str, params: Dict, id: str = "1", jsonrpc: str = "2.0"):
+    async def __jsonrpc_request(
+        self, session, method: str, params: Dict, id: str = "1", jsonrpc: str = "2.0"
+    ):
         payload = {
             "id": id,
             "jsonrpc": jsonrpc,
@@ -156,7 +177,9 @@ class TonCenterClient:
             "params": params,
         }
 
-        async with session.post(self.provider.base_url + "jsonRPC", json=payload, headers=self.__headers()) as resp:
+        async with session.post(
+            self.provider.base_url + "jsonRPC", json=payload, headers=self.__headers()
+        ) as resp:
             return await self.__parse_response(resp)
 
     def __headers(self):
@@ -172,7 +195,7 @@ class TonCenterClient:
     async def __parse_response(self, resp):
         try:
             resp = await resp.json()
-        except Exception:
+        except Exception:  # TODO: catch correct exceptions
             raise ToncenterWrongResult(resp.status)
 
         if not resp["ok"]:

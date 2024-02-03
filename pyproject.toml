@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "ticton-python-sdk"
-version = "0.1.0"
+name = "ticton"
+version = "0.1.1"
 description = ""
 authors = ["alan890104 <alan890104@gmail.com>"]
 readme = "README.md"
