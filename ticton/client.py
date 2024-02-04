@@ -23,6 +23,8 @@ OracleMetadata = TypedDict(
         "min_base_asset_threshold": int,
         "base_asset_wallet_address": Address,
         "quote_asset_wallet_address": Address,
+        "base_asset_symbol": str,
+        "quote_asset_symbol": str,
         "is_initialized": bool,
     },
 )
@@ -121,6 +123,24 @@ class TicTonAsyncClient:
         quote_asset_wallet_address = CellSlice(
             metadata_res[6][1]["bytes"]
         ).load_address()
+        if (
+            Address(base_asset_address).to_string(False)
+            == "0:0000000000000000000000000000000000000000000000000000000000000000"
+        ):
+            base_asset_symbol = "TON"
+        else:
+            base_asset_metadata = await client.get_jetton_metadata(base_asset_address)
+            base_asset_symbol = base_asset_metadata["jetton_content"]["data"]["symbol"]
+        if (
+            Address(quote_asset_address).to_string(False)
+            == "0:0000000000000000000000000000000000000000000000000000000000000000"
+        ):
+            quote_asset_symbol = "TON"
+        else:
+            quote_asset_metadata = await client.get_jetton_metadata(quote_asset_address)
+            quote_asset_symbol = quote_asset_metadata["jetton_content"]["data"][
+                "symbol"
+            ]
         is_initialized = bool(metadata_res[7][1])
 
         metadata: OracleMetadata = {
@@ -128,6 +148,8 @@ class TicTonAsyncClient:
             "quote_asset_address": Address(quote_asset_address),
             "base_asset_decimals": base_asset_decimals,
             "quote_asset_decimals": quote_asset_decimals,
+            "base_asset_symbol": base_asset_symbol,
+            "quote_asset_symbol": quote_asset_symbol,
             "min_base_asset_threshold": min_base_asset_threshold,
             "base_asset_wallet_address": Address(base_asset_wallet_address),
             "quote_asset_wallet_address": Address(quote_asset_wallet_address),

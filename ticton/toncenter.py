@@ -76,6 +76,15 @@ class TonCenterClient:
 
         return result
 
+    async def get_jetton_metadata(self, jetton_address):
+        req = {
+            "func": self.__jsonrpc_request,
+            "args": ["getTokenData"],
+            "kwargs": {"params": {"address": jetton_address}},
+        }
+        result = await self._run(req)
+        return result
+
     async def get_jetton_wallet(self, master_address, account_address):
         request_stack = [
             [
