@@ -139,20 +139,22 @@ class TonCenterClient:
         return address
 
     async def get_alarm_info(self, alarm_address: str):
-        get_methods = [
-            "getBaseAssetScale",
-            "getQuoteAssetScale",
-            "getRemainScale",
-            "getBaseAssetPrice",
-        ]
-        tasks = [
-            self.run_get_method(alarm_address, method, []) for method in get_methods
-        ]
-        results = await asyncio.gather(*tasks)
-        base_asset_scale, quote_asset_scale, remain_scale, base_asset_price = [
-            int(result, 16) for result in results
-        ]
+        alarm_addr = prepare_address(alarm_address)
+        result = await self._run(
+            self.provider.raw_run_method(alarm_addr, "getAlarmMetadata", [])
+        )
+
+        if result.get("@type") == "smc.runResult" and "stack" in result:
+            result = result["stack"]
+
+        watch_maker_address = CellSlice(result[0][1]["bytes"]).load_address()
+        base_asset_scale = int(result[1][1], 16)
+        quote_asset_scale = int(result[2][1], 16)
+        remain_scale = int(result[3][1], 16)
+        base_asset_price = int(result[4][1], 16) / 2**64
+
         return {
+            "watch_maker_address": watch_maker_address,
             "base_asset_scale": base_asset_scale,
             "quote_asset_scale": quote_asset_scale,
             "remain_scale": remain_scale,

@@ -110,7 +110,7 @@ class TicTonAsyncClient:
         get the oracle's metadata
         """
         metadata_res = await client.get_oracle_data(oracle_addr, "getOracleData", [])
-        assert len(metadata_res) == 8, "invalid oracle data"
+        assert len(metadata_res) == 10, "invalid oracle data"
 
         base_asset_address = CellSlice(metadata_res[0][1]["bytes"]).load_address()
         quote_asset_address = CellSlice(metadata_res[1][1]["bytes"]).load_address()
@@ -142,6 +142,8 @@ class TicTonAsyncClient:
                 "symbol"
             ]
         is_initialized = bool(metadata_res[7][1])
+        latest_base_asset_price = int(metadata_res[8][1], 16)
+        latest_timestamp = int(metadata_res[9][1], 16)
 
         metadata: OracleMetadata = {
             "base_asset_address": Address(base_asset_address),
@@ -154,6 +156,8 @@ class TicTonAsyncClient:
             "base_asset_wallet_address": Address(base_asset_wallet_address),
             "quote_asset_wallet_address": Address(quote_asset_wallet_address),
             "is_initialized": is_initialized,
+            "latest_base_asset_price": latest_base_asset_price,
+            "latest_timestamp": latest_timestamp,
         }
 
         return metadata
@@ -389,6 +393,13 @@ class TicTonAsyncClient:
             if op == "Tock":
                 return data["alarm_id"]
         return None
+
+    async def get_alarm_info(self, alarm_address: str):
+        """
+        get the alarm info
+        """
+        result = await self.toncenter.get_alarm_info(alarm_address)
+        return result
 
     async def get_alarms_amount(self):
         """
