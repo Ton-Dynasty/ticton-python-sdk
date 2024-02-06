@@ -362,10 +362,11 @@ class TicTonAsyncClient:
                         "remain_scale": remain_scale - new_scale / 2,
                     }
                 }
-            elif opcode == "0xc3510a29":
+            elif opcode == "0x54451598":
                 query_id = cs.load_uint(257)
                 alarm_id = cs.load_uint(257)
-                return {"Ring": {"alarm_id": alarm_id}}
+                created_at = cs.load_int(257)
+                return {"Ring": {"alarm_id": alarm_id, "created_at": created_at}}
 
             elif opcode == "0x9c0fafb":
                 alarm_id = cs.load_uint(256)
@@ -375,23 +376,45 @@ class TicTonAsyncClient:
 
                 return {
                     "Tock": {
-                        "alarm_id": alarm_id,
-                        "watchmaker": watchmaker,
+                        "new_alarm_id": alarm_id,
+                        "created_at": created_at,
                     }
                 }
 
+            elif opcode == "0x89b71d09":
+                origin = cs.load_address()
+                receiver = cs.load_address()
+                amount = cs.load_uint(257)
+
+                return {
+                    "JettonMint": {
+                        "origin": origin,
+                        "receiver": receiver,
+                        "amount": amount,
+                    }
+                }
             return None
         except Exception as e:
-            # self.logger.error(f"Error while parsing {e}")
+            self.logger.error(f"Error while parsing {e}")
             return None
 
-    async def _get_tock_alarm_id(self, out_msg_body):
+    async def _get_jetton_mint_data(self, out_msg_body):
+        result = await self._parse(out_msg_body)
+        if result is None:
+            return None
+        for op, data in result.items():
+            if op == "JettonMint":
+                return data
+        return None
+
+    async def _get_tock_data(self, out_msg_body):
         result = await self._parse(out_msg_body)
         if result is None:
             return None
         for op, data in result.items():
             if op == "Tock":
-                return data["alarm_id"]
+                return data
+
         return None
 
     async def get_alarm_info(self, alarm_address: str):
@@ -712,9 +735,14 @@ class TicTonAsyncClient:
         - watchmaker: str
         - base_asset_price: float
         - new_alarm_id: int
+        - created_at: int
 
         on_ring_success params:
         - alarm_id: int
+        - created_at: int
+        - origin: str
+        - receiver: str
+        - amount: int
 
         on_wind_success params:
         - timekeeper: str
@@ -722,6 +750,7 @@ class TicTonAsyncClient:
         - new_base_asset_price: float
         - remain_scale: int
         - new_alarm_id: int
+        - created_at: int
         """
         self.logger.info(f"Start Subscribing: {self.oracle.to_string()}")
         while True:
@@ -755,17 +784,25 @@ class TicTonAsyncClient:
                         continue
                     for op, data in result.items():
                         if op == "Tick":
+                            tock_data = await self._get_tock_data(out_msg_body)
+                            if tock_data is not None:
+                                data.update(tock_data)
                             if on_tick_success is not None:
-                                alarm_id = await self._get_tock_alarm_id(out_msg_body)
-                                data["new_alarm_id"] = alarm_id
                                 await on_tick_success(**data)
                         elif op == "Ring":
+                            out_msg_body = transaction_tree["out_msgs"][1]["msg_data"][
+                                "body"
+                            ]
+                            reward_data = await self._get_jetton_mint_data(out_msg_body)
+                            if reward_data is not None:
+                                data.update(reward_data)
                             if on_ring_success is not None:
                                 await on_ring_success(**data)
                         elif op == "Wind":
+                            tock_data = await self._get_tock_data(out_msg_body)
+                            if tock_data is not None:
+                                data.update(tock_data)
                             if on_wind_success is not None:
-                                alarm_id = await self._get_tock_alarm_id(out_msg_body)
-                                data["new_alarm_id"] = alarm_id
                                 await on_wind_success(**data)
 
             except Exception as e:

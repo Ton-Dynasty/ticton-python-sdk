@@ -147,14 +147,14 @@ class TonCenterClient:
         if result.get("@type") == "smc.runResult" and "stack" in result:
             result = result["stack"]
 
-        watch_maker_address = CellSlice(result[0][1]["bytes"]).load_address()
+        watchmaker_address = CellSlice(result[0][1]["bytes"]).load_address()
         base_asset_scale = int(result[1][1], 16)
         quote_asset_scale = int(result[2][1], 16)
         remain_scale = int(result[3][1], 16)
         base_asset_price = int(result[4][1], 16) / 2**64
 
         return {
-            "watch_maker_address": watch_maker_address,
+            "watchmaker_address": watchmaker_address,
             "base_asset_scale": base_asset_scale,
             "quote_asset_scale": quote_asset_scale,
             "remain_scale": remain_scale,
