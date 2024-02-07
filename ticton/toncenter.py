@@ -151,9 +151,9 @@ class TonCenterClient:
         base_asset_scale = int(result[1][1], 16)
         quote_asset_scale = int(result[2][1], 16)
         remain_scale = int(result[3][1], 16)
-        base_asset_price = int(result[4][1], 16) / 2**64
-        base_asset_amount = int(result[5][1], 16)
-        quote_asset_amount = int(result[6][1], 16)
+        base_asset_price = 1000 * (int(result[4][1], 16) / 2**64)
+        base_asset_amount = int(result[5][1], 16) / 10**9
+        quote_asset_amount = int(result[6][1], 16) / 10**6
         created_at = int(result[7][1], 16)
 
         return {
