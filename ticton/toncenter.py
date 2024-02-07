@@ -151,7 +151,10 @@ class TonCenterClient:
         base_asset_scale = int(result[1][1], 16)
         quote_asset_scale = int(result[2][1], 16)
         remain_scale = int(result[3][1], 16)
-        base_asset_price = int(result[4][1], 16) / 2**64
+        base_asset_price = 1000 * (int(result[4][1], 16) / 2**64)
+        base_asset_amount = int(result[5][1], 16) / 10**9
+        quote_asset_amount = int(result[6][1], 16) / 10**6
+        created_at = int(result[7][1], 16)
 
         return {
             "watchmaker_address": watchmaker_address,
@@ -159,6 +162,9 @@ class TonCenterClient:
             "quote_asset_scale": quote_asset_scale,
             "remain_scale": remain_scale,
             "base_asset_price": base_asset_price,
+            "base_asset_amount": base_asset_amount,
+            "quote_asset_amount": quote_asset_amount,
+            "created_at": created_at,
         }
 
     async def send_boc(self, boc):
