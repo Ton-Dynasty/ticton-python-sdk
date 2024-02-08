@@ -2,7 +2,7 @@ from decimal import Decimal
 import logging
 import asyncio
 import time
-from tonsdk.utils import Address, bytes_to_b64str
+from tonsdk.utils import Address
 from tonsdk.boc import Cell, begin_cell
 from tonsdk.contract.wallet import Wallets
 from tonpy import CellSlice
@@ -42,7 +42,8 @@ class TicTonAsyncClient:
         *,
         logger: Optional[logging.Logger] = None,
     ) -> None:
-        _, _, _, self.wallet = Wallets.from_mnemonics(mnemonics.split(" "), wallet_version)  # type: ignore
+        if mnemonics is not None and oracle_addr is not None:
+            _, _, _, self.wallet = Wallets.from_mnemonics(mnemonics.split(" "), wallet_version)
         self.oracle = Address(oracle_addr)
         if logger is None:
             self.logger = logging.getLogger(__name__)
