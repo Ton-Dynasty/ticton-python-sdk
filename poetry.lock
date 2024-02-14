@@ -951,13 +951,13 @@ testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "no
 
 [[package]]
 name = "pytoncenter"
-version = "0.0.9"
+version = "0.0.10"
 description = ""
 optional = false
 python-versions = ">=3.9,<3.12"
 files = [
-    {file = "pytoncenter-0.0.9-py3-none-any.whl", hash = "sha256:9acd25966bc0f1243383862d754a7577430375ab63179377991e7119f9023506"},
-    {file = "pytoncenter-0.0.9.tar.gz", hash = "sha256:ffecc64fa300eda53229c0a2b0fdc74025fd4cc12ef639579015351d50c4a67c"},
+    {file = "pytoncenter-0.0.10-py3-none-any.whl", hash = "sha256:93f607d4b5544dabb4811cddf24edaff0531a68770d2ddf42e316e291f9c0d01"},
+    {file = "pytoncenter-0.0.10.tar.gz", hash = "sha256:c2837efc194ea5e4c38fe3cd8b9ade508e207045fdc36195455e96097035918a"},
 ]
 
 [package.dependencies]
@@ -1291,4 +1291,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "bc34c2c57540ce50a8dcc48b9a4d6792e40d3f5651a812d56904c39e4844af0e"
+content-hash = "962e28c8310170e0b6ab7d50a758808003bb2a1a1735c156156c51fffebe77e8"
