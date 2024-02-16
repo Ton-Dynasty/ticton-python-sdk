@@ -193,6 +193,13 @@ class TicTonAsyncClient:
             ),
         )
 
+        assert isinstance(
+            base_asset_balance, Decimal
+        ), "base_asset_balance is not Decimal"
+        assert isinstance(
+            quote_asset_balance, Decimal
+        ), "quote_asset_balance is not Decimal"
+
         return (base_asset_balance, quote_asset_balance)
 
     async def _send(
