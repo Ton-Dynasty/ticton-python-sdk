@@ -136,7 +136,7 @@ class TicTonAsyncClient:
         toncenter = get_client(
             version="v3",
             network="testnet" if testnet else "mainnet",
-            custom_api_key=toncenter_api_key,
+            api_key=toncenter_api_key,
         )
 
         raw_oracle_metadata = await toncenter.run_get_method(
