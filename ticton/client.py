@@ -23,7 +23,7 @@ from pytoncenter.v3.models import (
     GetJettonWalletsRequest,
     GetMethodParameterInput,
     GetWalletRequest,
-    GetTransactionRequest,
+    GetTransactionsRequest,
     GetSpecifiedJettonWalletRequest,
     ExternalMessage,
 )
