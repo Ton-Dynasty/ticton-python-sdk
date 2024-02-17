@@ -126,7 +126,7 @@ async def handle_chime(
     if new_alarm_index is None:
         return
 
-    on_wind_success(
+    await on_wind_success(
         OnWindSuccessParams(
             timekeeper=tock_msg.watchmaker,  # type: ignore
             alarm_id=wind_msg.alarm_index,
@@ -167,7 +167,7 @@ async def handle_chronoshift(
             receiver = jetton_mint_msg.receiver
             reward = float(jetton_mint_msg.amount) / 1e9
 
-    on_ring_success(
+    await on_ring_success(
         OnRingSuccessParams(
             alarm_id=chronoshift_msg.alarm_index,
             created_at=chronoshift_msg.created_at,

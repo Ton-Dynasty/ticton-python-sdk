@@ -382,7 +382,7 @@ class TicTonAsyncClient:
             seqno=wallet_info.seqno,
             body=body,
         )
-        
+
         args = [
             price,
             token_to_float(forward_ton_amount + gas_fee, self.metadata.base_asset_decimals),
@@ -599,7 +599,7 @@ class TicTonAsyncClient:
             start_utime = time.monotonic()
             txs = await self.toncenter.get_transactions(
                 GetTransactionsRequest(
-                    account="kQBXgF5mlp3AY7eg1jc6gsWbpCdkzs8EvfkLR3mzIZ2xT1Ys",
+                    account=self.oracle.to_string(True),
                     start_lt=params.start_lt,
                     limit=params.limit,
                     offset=params.offset,

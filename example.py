@@ -40,7 +40,7 @@ async def main():
         alarm_id = int(input("Enter the alarm id: "))
         await ring(client, alarm_id)
     elif choice == 3:
-        options = f"max: {client.metadata.total_alarms-1}"
+        options = f"latest: {client.metadata.total_alarms-1}"
         alarm_id = int(input(f"Enter the alarm id ({options}): "))
         print("Loading alarm metadata...")
         alarm_addr = await client.get_alarm_address(alarm_id)
