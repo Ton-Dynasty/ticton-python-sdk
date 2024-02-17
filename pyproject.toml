@@ -11,7 +11,7 @@ aiohttp = "^3.9.3"
 tonsdk = "1.0.13"
 tonpy = "0.0.0.1.2b0"
 tvm-valuetypes = "^0.0.12"
-pytoncenter = "0.0.10"
+pytoncenter = "0.0.11"
 
 
 [tool.poetry.group.dev.dependencies]
