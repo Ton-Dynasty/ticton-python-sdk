@@ -70,7 +70,7 @@ async def _handle_tick(
     try:
         tick_msg = TicTonMessage.Tick.parse(body)
     except Exception as e:
-        print(f"Handle tick failed: {traceback.format_exc()} ")
+        print(f"Handle tick failed: {e} ")
         return
     for candidate in tx.out_msgs:
         if candidate.message_content is None:

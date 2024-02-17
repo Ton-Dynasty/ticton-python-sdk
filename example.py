@@ -44,6 +44,11 @@ async def main():
         alarm_id = int(input(f"Enter the alarm id ({options}): "))
         print("Loading alarm metadata...")
         alarm_addr = await client.get_alarm_address(alarm_id)
+        alarm_state = await client.get_address_state(alarm_addr)
+        if alarm_state != "active":
+            sys.stdout.write("\033[F")
+            print("Sorry, the alarm is not active, you can't wind it.")
+            return
         alarm_metadata = await client.get_alarm_metadata(alarm_addr)
         remain_scale = alarm_metadata.remain_scale
         decimal_ratio = 10 ** (client.metadata.base_asset_decimals - client.metadata.quote_asset_decimals)
