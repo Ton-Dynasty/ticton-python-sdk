@@ -496,7 +496,7 @@ class TicTonAsyncClient:
             Decimal(forward_ton_amount + gas_fee), quote_asset_transfered
         )
         assert can_afford, "not enough balance"
-
+        print(f"base_asset_price: {base_asset_price}")
         forward_info = (
             begin_cell()
             .store_uint(0, 8)

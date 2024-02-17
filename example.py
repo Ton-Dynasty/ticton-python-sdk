@@ -10,21 +10,24 @@ async def tick(price):
     client = await TicTonAsyncClient.init(
         testnet=True,
     )
-    await client.tick(price)
+    txhash = await client.tick(price)
+    print(txhash)
 
 
 async def ring(alarm_id):
     client = await TicTonAsyncClient.init(
         testnet=True,
     )
-    await client.ring(alarm_id)
+    txhash = await client.ring(alarm_id)
+    print(txhash)
 
 
 async def wind(alarm_id, buy_num, price):
     client = await TicTonAsyncClient.init(
         testnet=True,
     )
-    await client.wind(alarm_id, buy_num, price)
+    txhash = await client.wind(alarm_id, buy_num, price)
+    print(txhash)
 
 
 async def main():
