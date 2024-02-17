@@ -610,14 +610,15 @@ class TicTonAsyncClient:
             params.offset += len(txs)
 
             for tx in txs:
-                msg = tx.in_msg
-                if msg.message_content is None:
-                    continue
-                cs = CellSlice(msg.message_content.body)
-                opcode = get_opcode(cs.preload_uint(32))
-                if opcode == "0x00000000":  # Comment Message
-                    continue
                 try:
+                    msg = tx.in_msg
+                    if msg.message_content is None:
+                        continue
+                    cs = CellSlice(msg.message_content.body)
+                    opcode = get_opcode(cs.preload_uint(32))
+                    if opcode == "0x00000000":  # Comment Message
+                        continue
+
                     handle_func = callbacks.get(opcode, handle_noop)
                     await handle_func(
                         client=self.toncenter,
