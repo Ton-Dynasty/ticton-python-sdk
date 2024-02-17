@@ -1,7 +1,6 @@
 from pytoncenter.extension.message import BaseMessage
 from pytoncenter.address import Address
 from pytoncenter.utils import get_opcode
-from typing import Optional
 from tonpy import CellSlice
 
 
@@ -16,7 +15,7 @@ class TicTonMessage:
         ):
             self.expire_at = expire_at
             self.base_asset_price = base_asset_price
-        
+
         @classmethod
         def _preparse(cls, cs: CellSlice) -> CellSlice:
             opcode = get_opcode(cs.load_uint(8))
@@ -231,16 +230,3 @@ class TicTonMessage:
                 receiver=receiver,
                 amount=amount,
             )
-
-
-if __name__ == "__main__":
-    from pytoncenter.utils import encode_base64
-
-    cs = CellSlice(
-        encode_base64(
-            "b5ee9c720101020100900001d309c0fafb0000000000000000000000000000000000000000000000000000000000000008000000020000000000000000000000000000000000000000000000000000000032e7baab40029754304394b879c1a3e45275b8a4919677a9622d64b7578f27dff6537f792e58010041000000000000000000000000000000000000000000000000004816f0068db8bc40"
-        )
-    )
-    msg = TicTonMessage.Tock.parse(cs)
-    print(msg.__dict__)
-    print(msg)
