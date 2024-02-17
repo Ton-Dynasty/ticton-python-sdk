@@ -617,15 +617,18 @@ class TicTonAsyncClient:
                 opcode = get_opcode(cs.preload_uint(32))
                 if opcode == "0x00000000":  # Comment Message
                     continue
-                handle_func = callbacks.get(opcode, handle_noop)
-                await handle_func(
-                    client=self.toncenter,
-                    body=cs,
-                    tx=tx,
-                    on_tick_success=on_tick_success,
-                    on_wind_success=on_wind_success,
-                    on_ring_success=on_ring_success,
-                )
+                try:
+                    handle_func = callbacks.get(opcode, handle_noop)
+                    await handle_func(
+                        client=self.toncenter,
+                        body=cs,
+                        tx=tx,
+                        on_tick_success=on_tick_success,
+                        on_wind_success=on_wind_success,
+                        on_ring_success=on_ring_success,
+                    )
+                except:
+                    pass
 
             end_utime = time.monotonic()
             runtime = end_utime - start_utime
