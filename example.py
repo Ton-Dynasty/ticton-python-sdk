@@ -1,31 +1,25 @@
 from ticton import TicTonAsyncClient
 import asyncio
-
+import logging
 from dotenv import load_dotenv
+import sys
 
 load_dotenv()
 
+LOGGER = logging.getLogger(__name__)
 
-async def tick(price):
-    client = await TicTonAsyncClient.init(
-        testnet=True,
-    )
+
+async def tick(client: TicTonAsyncClient, price: float):
     txhash = await client.tick(price)
     print(txhash)
 
 
-async def ring(alarm_id):
-    client = await TicTonAsyncClient.init(
-        testnet=True,
-    )
+async def ring(client: TicTonAsyncClient, alarm_id: int):
     txhash = await client.ring(alarm_id)
     print(txhash)
 
 
-async def wind(alarm_id, buy_num, price):
-    client = await TicTonAsyncClient.init(
-        testnet=True,
-    )
+async def wind(client: TicTonAsyncClient, alarm_id: int, buy_num: int, price: float):
     txhash = await client.wind(alarm_id, buy_num, price)
     print(txhash)
 
@@ -37,17 +31,31 @@ async def main():
     print("3. wind")
     choice = int(input("Enter your choice (1/2/3): "))
 
+    client = await TicTonAsyncClient.init(testnet=True, logger=LOGGER)
+
     if choice == 1:
         price = float(input("Enter the price: "))
-        await tick(price)
+        await tick(client, price)
     elif choice == 2:
         alarm_id = int(input("Enter the alarm id: "))
-        await ring(alarm_id)
+        await ring(client, alarm_id)
     elif choice == 3:
-        alarm_id = int(input("Enter the alarm id: "))
-        buy_num = int(input("Enter the buy num: "))
-        price = float(input("Enter the price: "))
-        await wind(alarm_id, buy_num, price)
+        options = f"max: {client.metadata.total_alarms-1}"
+        alarm_id = int(input(f"Enter the alarm id ({options}): "))
+        print("Loading alarm metadata...")
+        alarm_addr = await client.get_alarm_address(alarm_id)
+        alarm_metadata = await client.get_alarm_metadata(alarm_addr)
+        remain_scale = alarm_metadata.remain_scale
+        decimal_ratio = 10 ** (client.metadata.base_asset_decimals - client.metadata.quote_asset_decimals)
+        old_price = alarm_metadata.base_asset_price * decimal_ratio / 2**64
+        sys.stdout.write("\033[F")
+        if remain_scale == 0:
+            print("Sorry, the alarm remains 0 scale, you can't buy it.")
+            return
+        rng = "max: 1" if remain_scale == 1 else f"1~{remain_scale}"
+        buy_num = int(input(f"Enter the buy num ({rng}): "))
+        price = float(input(f"Enter the price (alarm price: {old_price}): "))
+        await wind(client, alarm_id, buy_num, price)
     else:
         print("Invalid choice")
 
