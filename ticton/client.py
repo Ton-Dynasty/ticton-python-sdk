@@ -3,27 +3,31 @@ from decimal import Decimal
 import logging
 import asyncio
 import time
+from pydantic import BaseModel, Field
+from pytoncenter.utils import get_opcode
 
-# from tonsdk.utils import Address
 from tonsdk.utils import bytes_to_b64str
 from tonsdk.boc import Cell, begin_cell
 from tonsdk.contract.wallet import Wallets
 from tonpy import CellSlice
-from typing import Dict, Tuple, Optional, Literal, Callable, TypedDict, List, Type
+from typing import Any, Coroutine, Dict, Tuple, Optional, Literal, Callable, List, Type, Union
 from .arithmetic import FixedFloat, to_token, token_to_float
+from .callbacks import OnTickSuccessParams, OnWindSuccessParams, OnRingSuccessParams, handle_noop, handle_chime, handle_chronoshift, handle_notification
+from pytoncenter.extension.message import JettonMessage
+from .parser import TicTonMessage
 from os import getenv
 
-# from .toncenter import TonCenterClient
+
 from pytoncenter import get_client, AsyncTonCenterClientV3
 from pytoncenter.v3.models import (
     AddressLike,
     RunGetMethodRequest,
     GetAccountRequest,
-    GetJettonWalletsRequest,
-    GetJettonWalletsRequest,
+    GetBlockRequest,
     GetMethodParameterInput,
     GetWalletRequest,
-    GetTransactionRequest,
+    GetTransactionsRequest,
+    GetSpecifiedJettonWalletRequest,
     ExternalMessage,
 )
 from pytoncenter.address import Address as PyAddress
@@ -38,6 +42,14 @@ from .decoder import (
 )
 
 __all__ = ["TicTonAsyncClient"]
+
+
+class SubscribeParam(BaseModel):
+    start_lt: Optional[int] = Field(default=None, description="The lt to start from, if None, the oldest lt will be used")
+    interval: float = Field(default=2.0, description="The interval of the subscription in seconds")
+    limit: int = Field(default=256, ge=1, le=256, description="The limit of the subscription")
+    offset: int = Field(default=0, ge=0, description="The offset of the subscription")
+    account: AddressLike = Field(..., description="The account to subscribe to")
 
 
 class TicTonAsyncClient:
@@ -87,7 +99,6 @@ class TicTonAsyncClient:
         oracle_addr_str = getenv("TICTON_ORACLE_ADDRESS", oracle_addr)
         toncenter_api_key = getenv("TICTON_TONCENTER_API_KEY", toncenter_api_key)
         threshold_price = float(getenv("TICTON_THRESHOLD_PRICE", threshold_price))
-        assert mnemonics is not None, "mnemonics must be provided, you can either pass it as a parameter or set TICTON_WALLET_MNEMONICS environment variable"
         assert oracle_addr_str is not None, "oracle_addr must be provided, you can either pass it as a parameter or set TICTON_ORACLE_ADDRESS environment variable"
 
         toncenter = get_client(
@@ -146,14 +157,14 @@ class TicTonAsyncClient:
                 account = await self.toncenter.get_account(GetAccountRequest(address=account_address.to_string()))
                 return Decimal(account.balance)
             else:
-                jettons = await self.toncenter.get_jetton_wallets(
-                    GetJettonWalletsRequest(
+                jetton = await self.toncenter.get_jetton_wallets(
+                    GetSpecifiedJettonWalletRequest(
                         owner_address=account_address.to_string(),
                         jetton_address=master_address.to_string(),
                     )
                 )
-                assert len(jettons) == 1, f"Expected 1 jetton wallet, but got {len(jettons)}"
-                return Decimal(jettons[0].balance)
+                assert jetton is not None, "jetton wallet does not found"
+                return Decimal(jetton.balance)
 
         base_asset_balance, quote_asset_balance = await self.toncenter.multicall(
             _get_balance(
@@ -165,6 +176,9 @@ class TicTonAsyncClient:
                 PyAddress(self.wallet.address.to_string(True)),
             ),
         )
+
+        assert isinstance(base_asset_balance, Decimal), "base_asset_balance is not Decimal"
+        assert isinstance(quote_asset_balance, Decimal), "quote_asset_balance is not Decimal"
 
         return (base_asset_balance, quote_asset_balance)
 
@@ -273,104 +287,6 @@ class TicTonAsyncClient:
             return False
         return True
 
-    async def _parse(self, in_msg_body: str):
-        """
-        parse the in_msg_body and out_msg_body
-        """
-        try:
-            cs = CellSlice(in_msg_body)
-            opcode = str(hex(cs.load_uint(32)))
-            if opcode == "0x7362d09c":
-                query_id = cs.load_uint(64)
-                amount = cs.load_var_uint(16)
-                sender_address = cs.load_address()
-                forward_payload: CellSlice = cs.load_ref(as_cs=True)  # type: ignore
-                oracle_opcode = forward_payload.load_uint(8)
-                if oracle_opcode == 0:
-                    expire_at = forward_payload.load_uint(256)
-                    base_asset_price = forward_payload.load_int(256)
-                    base_asset_price = await self._convert_fixedfloat_to_price(FixedFloat(base_asset_price, skip_scale=True))
-                    return {
-                        "Tick": {
-                            "watchmaker": sender_address,
-                            "base_asset_price": base_asset_price,
-                        }
-                    }
-            elif opcode == "0x8eb5cd4":
-                alarm_id = cs.load_int(257)
-                timekeeper = cs.load_address()
-                new_base_asset_price = cs.load_uint(256)
-                cs: CellSlice = cs.load_ref(as_cs=True)  # type: ignore
-                new_scale = cs.load_int(257)
-                refund_quote_asset_amount = cs.load_int(16)
-                base_asset_price = cs.load_uint(256)
-                cs: CellSlice = cs.load_ref(as_cs=True)  # type: ignore
-                created_at = cs.load_int(257)
-                remain_scale = cs.load_int(257)
-                new_base_asset_price = await self._convert_fixedfloat_to_price(FixedFloat(new_base_asset_price, skip_scale=True))
-                return {
-                    "Wind": {
-                        "timekeeper": timekeeper,
-                        "alarm_id": alarm_id,
-                        "new_base_asset_price": new_base_asset_price,
-                        "remain_scale": remain_scale - new_scale / 2,
-                    }
-                }
-            elif opcode == "0x54451598":
-                query_id = cs.load_uint(257)
-                alarm_id = cs.load_uint(257)
-                created_at = cs.load_int(257)
-                return {"Ring": {"alarm_id": alarm_id, "created_at": created_at}}
-
-            elif opcode == "0x9c0fafb":
-                alarm_id = cs.load_uint(256)
-                scale = cs.load_uint(32)
-                created_at = cs.load_int(257)
-                watchmaker = cs.load_address()
-
-                return {
-                    "Tock": {
-                        "new_alarm_id": alarm_id,
-                        "created_at": created_at,
-                    }
-                }
-
-            elif opcode == "0x89b71d09":
-                origin = cs.load_address()
-                receiver = cs.load_address()
-                amount = cs.load_uint(257)
-
-                return {
-                    "JettonMint": {
-                        "origin": origin,
-                        "receiver": receiver,
-                        "amount": amount,
-                    }
-                }
-            return None
-        except Exception as e:
-            self.logger.error(f"Error while parsing {e}")
-            return None
-
-    async def _get_jetton_mint_data(self, out_msg_body):
-        result = await self._parse(out_msg_body)
-        if result is None:
-            return None
-        for op, data in result.items():
-            if op == "JettonMint":
-                return data
-        return None
-
-    async def _get_tock_data(self, out_msg_body):
-        result = await self._parse(out_msg_body)
-        if result is None:
-            return None
-        for op, data in result.items():
-            if op == "Tock":
-                return data
-
-        return None
-
     async def get_alarm_metadata(self, alarm_address: PyAddress) -> AlarmMetadata:
         """
         get the alarm info
@@ -433,7 +349,6 @@ class TicTonAsyncClient:
 
         can_afford = await self._can_afford(Decimal(forward_ton_amount + gas_fee), quote_asset_transfered)
         assert can_afford, "not enough balance"
-
         forward_info = begin_cell().store_uint(0, 8).store_uint(expire_at, 256).store_uint(base_asset_price, 256).end_cell()
 
         wallet_info = await self.toncenter.get_wallet(GetWalletRequest(address=self.wallet.address.to_string()))
@@ -451,30 +366,29 @@ class TicTonAsyncClient:
             .end_cell()
         )
 
-        jetton_wallets = await self.toncenter.get_jetton_wallets(
-            GetJettonWalletsRequest(
+        jetton_wallet = await self.toncenter.get_jetton_wallets(
+            GetSpecifiedJettonWalletRequest(
                 owner_address=self.wallet.address.to_string(),
                 jetton_address=self.metadata.quote_asset_address,
             )
         )
 
-        assert len(jetton_wallets) == 1, f"Expected 1 jetton wallet, but got {len(jetton_wallets)}"
-
+        assert jetton_wallet is not None, "jetton wallet does not found"
         assert wallet_info.seqno is not None, "seqno is not found"
 
         result = await self._send(
-            to_address=jetton_wallets[0].address.to_string(),  # type: ignore
+            to_address=jetton_wallet.address.to_string(),  # type: ignore
             amount=forward_ton_amount + gas_fee,
             seqno=wallet_info.seqno,
             body=body,
         )
-
+        
         args = [
             price,
             token_to_float(forward_ton_amount + gas_fee, self.metadata.base_asset_decimals),
             token_to_float(quote_asset_transfered, self.metadata.quote_asset_decimals),
         ]
-        log_info = ("Tick Success, tick price: {}, spend base asset: {}, spend quote asset: {}").format(*args)
+        log_info = ("Tick message successfully sent, tick price: {}, spend base asset: {}, spend quote asset: {}").format(*args)
         self.logger.info(log_info)
 
         return result
@@ -511,7 +425,7 @@ class TicTonAsyncClient:
         )
 
         args = [alarm_id]
-        log_info = "Ring Success, alarm id: {}".format(*args)
+        log_info = "Ring message successfully sent, alarm id: {}".format(*args)
         self.logger.info(log_info)
 
         return result
@@ -568,7 +482,7 @@ class TicTonAsyncClient:
         wallet = await self.toncenter.get_wallet(GetWalletRequest(address=self.wallet.address.to_string()))
         assert wallet.seqno is not None, "seqno is not found in wallet info"
 
-        gas_fee = int(0.13 * 10**9)
+        gas_fee = int(0.5 * 10**9)
 
         can_afford = await self._can_afford(Decimal(need_base_asset + gas_fee), need_quote_asset)
         assert can_afford, "not enough balance"
@@ -583,22 +497,22 @@ class TicTonAsyncClient:
             .store_address(self.oracle)
             .store_address(self.wallet.address)
             .store_bit(False)
-            .store_coins(int(need_base_asset))
+            .store_coins(int(need_base_asset) + gas_fee)
             .store_ref(forward_info)
             .end_cell()
         )
 
-        jetton_wallets = await self.toncenter.get_jetton_wallets(
-            GetJettonWalletsRequest(
+        jetton_wallet = await self.toncenter.get_jetton_wallets(
+            GetSpecifiedJettonWalletRequest(
                 owner_address=self.wallet.address.to_string(),
                 jetton_address=self.metadata.quote_asset_address,
             )
         )
 
-        assert len(jetton_wallets) == 1, f"Wind: Expected 1 jetton wallet, but got {len(jetton_wallets)}"
+        assert jetton_wallet is not None, "jetton wallet does not found"
 
         result = await self._send(
-            to_address=jetton_wallets[0].address.to_string(),  # type: ignore
+            to_address=jetton_wallet.address.to_string(),  # type: ignore
             amount=int(need_base_asset) + gas_fee,
             seqno=wallet.seqno,
             body=body,
@@ -611,93 +525,110 @@ class TicTonAsyncClient:
             token_to_float(need_base_asset, self.metadata.base_asset_decimals),
             token_to_float(need_quote_asset, self.metadata.quote_asset_decimals),
         ]
-        log_info = ("Wind Success, alarm id: {}, buy num: {}, wind price: {}, spend base asset: {}, spend quote asset: {}").format(*args)
+        log_info = ("Wind message successfully sent, alarm id: {}, buy num: {}, wind price: {}, spend base asset: {}, spend quote asset: {}").format(*args)
         self.logger.info(log_info)
 
         return result
 
+    async def _validate_subscribe_param(self, start_lt: Union[int, Literal["latest", "oldest"]], interval: Union[int, float], limit: int) -> SubscribeParam:
+        # Check start_lt
+        assert isinstance(start_lt, int) or start_lt in ["latest", "oldest"], "start_lt must be an int or 'latest' or 'oldest'"
+        # Default option is "oldest"
+        begin_lt = None
+        if isinstance(start_lt, int):
+            begin_lt = start_lt
+        if start_lt == "latest":
+            latest_txs = await self.toncenter.get_transactions(
+                GetTransactionsRequest(
+                    account=self.oracle.to_string(),
+                    limit=1,
+                    sort="desc",
+                )
+            )
+            begin_lt = latest_txs[0].lt if len(latest_txs) == 1 else None
+        return SubscribeParam(
+            start_lt=begin_lt,
+            interval=interval,
+            limit=limit,
+            offset=0,
+            account=self.oracle.to_string(),
+        )
+
     async def subscribe(
         self,
-        on_tick_success: Optional[Callable] = None,
-        on_ring_success: Optional[Callable] = None,
-        on_wind_success: Optional[Callable] = None,
-        to_lt: int = 0,
+        on_tick_success: Callable[[OnTickSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_wind_success: Callable[[OnWindSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_ring_success: Callable[[OnRingSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        start_lt: Union[int, Literal["latest", "oldest"]] = "oldest",
+        interval: Union[int, float] = 2.0,
+        *,
+        limit: int = 128,
     ):
         """
-        subscribe will subscribe the oracle's transactions, handle the transactions and call the
-        given callbacks.
+        subscribe will subscribe to the oracle's notifications and chimes, and call the corresponding callback functions when a notification or chime is received.
 
-        on_tick_success params:
-        - watchmaker: str
-        - base_asset_price: float
-        - new_alarm_id: int
-        - created_at: int
+        Parameters
+        ----------
+        on_tick_success : Callable[[OnTickSuccessParams], Coroutine[Any, Any, None]]
+            The callback function to be called when a JettonTransferNotification(Tick) is received
 
-        on_ring_success params:
-        - alarm_id: int
-        - created_at: int
-        - origin: str
-        - receiver: str
-        - amount: int
+        on_wind_success : Callable[[OnWindSuccessParams], Coroutine[Any, Any, None]]
+            The callback function to be called when a chronoShift is received
 
-        on_wind_success params:
-        - timekeeper: str
-        - alarm_id: int
-        - new_base_asset_price: float
-        - remain_scale: int
-        - new_alarm_id: int
-        - created_at: int
+        on_ring_success : Callable[[OnRingSuccessParams], Coroutine[Any, Any, None]]
+            The callback function to be called when a chime is received
+
+        start_lt : Optional[int]
+            The lt to start from, if None, the oldest lt will be used
+
+        interval : float
+            The interval of the subscription in seconds, default is 2.0. If the runtime of the callback function is longer than the interval, the next subscription will run immediately after the callback function is finished.
+
+        limit : int
+            The limit of the subscription, default is 128. The maximum value is 128.
         """
-        self.logger.info(f"Start Subscribing: {self.oracle.to_string()}")
-        toncenter_v2 = get_client(version="v2", network="testnet", custom_api_key=self.toncenter.api_key)
+        params = await self._validate_subscribe_param(start_lt, interval, limit)
+
+        callbacks = {
+            JettonMessage.TransferNotification.OPCODE: handle_notification,
+            TicTonMessage.Chronoshift.OPCODE: handle_chronoshift,
+            TicTonMessage.Chime.OPCODE: handle_chime,
+        }
+
         while True:
-            try:
-                if to_lt == 0:
-                    params = {"address": self.oracle.to_string(), "limit": 20}
-                else:
-                    params = {
-                        "address": self.oracle.to_string(),
-                        "to_lt": to_lt,
-                    }
-                result = await toncenter_v2.get_transactions(**params)
+            start_utime = time.monotonic()
+            txs = await self.toncenter.get_transactions(
+                GetTransactionsRequest(
+                    account="kQBXgF5mlp3AY7eg1jc6gsWbpCdkzs8EvfkLR3mzIZ2xT1Ys",
+                    start_lt=params.start_lt,
+                    limit=params.limit,
+                    offset=params.offset,
+                    sort="asc",
+                )
+            )
 
-                # start from the last transaction
-                for transaction_tree in result[::-1]:
-                    tx_lt = transaction_tree["transaction_id"]["lt"]
-                    in_msg_body = transaction_tree["in_msg"]["msg_data"]["body"]  # type: ignore
-                    if len(transaction_tree["out_msgs"]) == 0:
-                        out_msg_body = ""
-                    elif "body" not in transaction_tree["out_msgs"][0]["msg_data"]:
-                        out_msg_body = ""
-                    else:
-                        out_msg_body = transaction_tree["out_msgs"][0]["msg_data"]["body"]
-                    if to_lt < int(tx_lt):
-                        to_lt = int(tx_lt) + 1
-                    result = await self._parse(in_msg_body)
+            params.offset += len(txs)
 
-                    if result is None:
-                        continue
-                    for op, data in result.items():
-                        if op == "Tick":
-                            tock_data = await self._get_tock_data(out_msg_body)
-                            if tock_data is not None:
-                                data.update(tock_data)
-                            if on_tick_success is not None:
-                                await on_tick_success(**data)
-                        elif op == "Ring":
-                            out_msg_body = transaction_tree["out_msgs"][1]["msg_data"]["body"]  # type: ignore
-                            reward_data = await self._get_jetton_mint_data(out_msg_body)
-                            if reward_data is not None:
-                                data.update(reward_data)
-                            if on_ring_success is not None:
-                                await on_ring_success(**data)
-                        elif op == "Wind":
-                            tock_data = await self._get_tock_data(out_msg_body)
-                            if tock_data is not None:
-                                data.update(tock_data)
-                            if on_wind_success is not None:
-                                await on_wind_success(**data)
+            for tx in txs:
+                msg = tx.in_msg
+                if msg.message_content is None:
+                    continue
+                cs = CellSlice(msg.message_content.body)
+                opcode = get_opcode(cs.preload_uint(32))
+                if opcode == "0x00000000":  # Comment Message
+                    continue
+                handle_func = callbacks.get(opcode, handle_noop)
+                await handle_func(
+                    client=self.toncenter,
+                    body=cs,
+                    tx=tx,
+                    on_tick_success=on_tick_success,
+                    on_wind_success=on_wind_success,
+                    on_ring_success=on_ring_success,
+                )
 
-            except Exception as e:
-                self.logger.error(f"Error while subscribing {e}")
-                continue
+            end_utime = time.monotonic()
+            runtime = end_utime - start_utime
+            sleep_time = max(params.interval - runtime, 0)
+            self.logger.debug(f"Sleeping for {sleep_time} seconds")
+            await asyncio.sleep(sleep_time)

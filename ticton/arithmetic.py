@@ -13,7 +13,9 @@ class FixedFloat:
         base: int = 2,
         skip_scale: bool = False,
     ):
-        assert isinstance(value, (int, float, str, Decimal, FixedFloat)), "Invalid type for FixedFloat, must be int, float, str, or Decimal"
+        assert isinstance(
+            value, (int, float, str, Decimal, FixedFloat)
+        ), "Invalid type for FixedFloat, must be int, float, str, or Decimal"
         if isinstance(value, FixedFloat):
             assert value.precision == precision, "Precision must match for FixedFloat"
             assert value.base == base, "Base must match for FixedFloat"
@@ -31,11 +33,11 @@ class FixedFloat:
     def _cast(self, value: Union[int, float, str, Decimal]) -> Decimal:
         return Decimal(value) * self.factor
 
-    def to_float(self) -> Decimal:
+    def to_float(self) -> float:
         """
         Convert fixed point number to float in human readable format
         """
-        return Decimal(self.raw_value) / self.factor
+        return float(Decimal(self.raw_value) / self.factor)
 
     def to_int(self) -> int:
         """
@@ -188,5 +190,5 @@ def to_token(value: Union[int, float, str, Decimal], decimals: int) -> Decimal:
     return Decimal(value) * (Decimal(10) ** decimals)
 
 
-def token_to_float(value: Union[int, float, str, Decimal], decimals: int) -> Decimal:
+def token_to_float(value: Union[int, float, str, Decimal], decimals: int) -> float:
     return float(Decimal(value) / (Decimal(10) ** decimals))
