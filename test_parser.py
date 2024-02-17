@@ -1,12 +1,13 @@
 from pytoncenter.extension.message import BaseMessage
 from pytoncenter.address import Address
+from pytoncenter.utils import get_opcode
 from typing import Optional
 from tonpy import CellSlice
 
 
 class TicTonMessage:
     class Tick(BaseMessage["Tick"]):
-        OPCODE = "0xe4366caf"
+        OPCODE = "0x00000000"
 
         def __init__(
             self,
@@ -15,6 +16,12 @@ class TicTonMessage:
         ):
             self.expire_at = expire_at
             self.base_asset_price = base_asset_price
+        
+        @classmethod
+        def _preparse(cls, cs: CellSlice) -> CellSlice:
+            opcode = get_opcode(cs.load_uint(8))
+            assert opcode == cls.OPCODE, f"opcode {opcode} is not {cls.OPCODE}"
+            return cs
 
         @classmethod
         def _parse(cls, body: CellSlice):
@@ -29,15 +36,17 @@ class TicTonMessage:
             )
 
     class Tock(BaseMessage["Tock"]):
-        OPCODE = "0x125c0ab7"
+        OPCODE = "0x09c0fafb"
 
         def __init__(
             self,
+            alarm_index: int,
             scale: int,
             created_at: int,
             watchmaker: Address,
             base_asset_price: int,
         ):
+            self.alarm_index = alarm_index
             self.scale = scale
             self.created_at = created_at
             self.watchmaker = watchmaker
@@ -46,13 +55,16 @@ class TicTonMessage:
         @classmethod
         def _parse(cls, body: CellSlice):
             """
-            tock#125c0ab7 scale:uint32 createdAt:int257 watchmaker:address baseAssetPrice:int257
+            tock#09c0fafb alarmIndex:uint256 scale:uint32 createdAt:int257 watchmaker:address baseAssetPrice:int257
             """
+            alarm_index = body.load_uint(256)
             scale = body.load_uint(32)
             created_at = body.load_int(257)
             watchmaker = Address(body.load_address())
+            body = body.load_ref(as_cs=True)
             base_asset_price = body.load_int(257)
             return cls(
+                alarm_index=alarm_index,
                 scale=scale,
                 created_at=created_at,
                 watchmaker=watchmaker,
@@ -115,9 +127,11 @@ class TicTonMessage:
             alarm_index = body.load_int(257)
             time_keeper = Address(body.load_address())
             new_base_asset_price = body.load_uint(256)
+            body = body.load_ref(as_cs=True)
             new_scale = body.load_int(257)
             refund_quote_asset_amount = body.load_int(257)
-            base_asset_price = body.load_int(257)
+            base_asset_price = body.load_uint(256)
+            body = body.load_ref(as_cs=True)
             created_at = body.load_int(257)
             remain_scale = body.load_int(257)
             preserve_base_asset_amount = body.load_int(257)
@@ -168,12 +182,15 @@ class TicTonMessage:
             query_id = body.load_int(257)
             alarm_index = body.load_int(257)
             created_at = body.load_int(257)
+            body = body.load_ref(as_cs=True)
             watchmaker = Address(body.load_address())
             base_asset_price = body.load_uint(256)
             remain_scale = body.load_int(257)
+            body = body.load_ref(as_cs=True)
             remain_base_asset_scale = body.load_int(257)
             remain_quote_asset_scale = body.load_int(257)
             extra_base_asset_amount = body.load_int(257)
+            body = body.load_ref(as_cs=True)
             extra_quote_asset_amount = body.load_int(257)
             return cls(
                 query_id=query_id,
@@ -219,6 +236,11 @@ class TicTonMessage:
 if __name__ == "__main__":
     from pytoncenter.utils import encode_base64
 
-    cs = CellSlice(encode_base64())
-    msg = TicTonMessage.JettonMintPartial.parse()
+    cs = CellSlice(
+        encode_base64(
+            "b5ee9c720101020100900001d309c0fafb0000000000000000000000000000000000000000000000000000000000000008000000020000000000000000000000000000000000000000000000000000000032e7baab40029754304394b879c1a3e45275b8a4919677a9622d64b7578f27dff6537f792e58010041000000000000000000000000000000000000000000000000004816f0068db8bc40"
+        )
+    )
+    msg = TicTonMessage.Tock.parse(cs)
+    print(msg.__dict__)
     print(msg)
