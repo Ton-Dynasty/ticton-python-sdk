@@ -165,19 +165,19 @@ given callbacks.
     - `new_alarm_id` : int
     - `created_at` : int
 
-- to_lt: int (optional, default=0)
-  - The latest transaction id to be subscribed.
+- start_lt: int, "oldest", "latest" (optional, default="oldest")
+  - From when to yield transaction, default to replay the transaction from the oldest transaction
 
 #### Examples
 ```python
-async def on_tick_success(watchmaker, base_asset_price, new_alarm_id, created_at):
-    print(f"Tick transaction successful: watchmaker={watchmaker}, base_asset_price={base_asset_price}, new_alarm_id={new_alarm_id}, created_at={created_at}")
+async def on_tick_success(params: OnTickSuccessParams):
+    print(f"Tick success", params.model_dump())
 
-async def on_ring_success(alarm_id, created_at, origin, receiver, amount):
-    print(f"Ring transaction successful: alarm_id={alarm_id}, created_at={created_at}, origin={origin}, receiver={receiver}, amount={amount}")
+async def on_ring_success(params: OnRingSuccessParams):
+    print(f"Tick success", params.model_dump())
 
-async def on_wind_success(timekeeper, alarm_id, new_base_asset_price, remain_scale, new_alarm_id, created_at):
-    print(f"Wind transaction successful: timekeeper={timekeeper}, alarm_id={alarm_id}, new_base_asset_price={new_base_asset_price}, remain_scale={remain_scale}, new_alarm_id={new_alarm_id}, created_at={created_at}")
+async def on_wind_success(params: OnWindSuccessParams):
+    print(f"Tick success", params.model_dump())
 
 await client.subscribe(on_tick_success, on_ring_success, on_wind_success)
 ```
