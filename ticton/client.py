@@ -3,6 +3,7 @@ from decimal import Decimal
 import logging
 import asyncio
 import time
+import warnings
 from pydantic import BaseModel, Field
 from pytoncenter.utils import get_opcode
 
@@ -340,11 +341,13 @@ class TicTonAsyncClient:
 
     async def _can_afford(self, need_base_asset: Decimal, need_quote_asset: Decimal):
         base_asset_balance, quote_asset_balance = await self._get_user_balance()
-        gas_fee = 1 * 10**9
         if (
-            need_base_asset + gas_fee > base_asset_balance
+            need_base_asset > base_asset_balance
             or need_quote_asset > quote_asset_balance
         ):
+            warnings.warn(
+                f"expected base asset: {need_base_asset / 10 ** self.metadata.base_asset_decimals}, quote asset: {need_quote_asset / 10 ** self.metadata.quote_asset_decimals}, but got base asset: {base_asset_balance/ 10 ** self.metadata.base_asset_decimals}, quote asset: {quote_asset_balance/ 10 ** self.metadata.quote_asset_decimals}"
+            )
             return False
         return True
 
@@ -428,7 +431,7 @@ class TicTonAsyncClient:
         can_afford = await self._can_afford(
             Decimal(forward_ton_amount + gas_fee), Decimal(quote_asset_transfered)
         )
-        assert can_afford, "not enough balance"
+        assert can_afford, "no enough balance"
         forward_info = (
             begin_cell()
             .store_uint(0, 8)
