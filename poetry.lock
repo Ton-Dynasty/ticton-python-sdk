@@ -1018,13 +1018,13 @@ cli = ["click (>=5.0)"]
 
 [[package]]
 name = "pytoncenter"
-version = "0.0.11"
+version = "0.0.12"
 description = ""
 optional = false
 python-versions = ">=3.9,<3.12"
 files = [
-    {file = "pytoncenter-0.0.11-py3-none-any.whl", hash = "sha256:55ef1e6f4b6f31aa8352552e676b88ee3b8eb5b15543aaab60752f06dc3dd131"},
-    {file = "pytoncenter-0.0.11.tar.gz", hash = "sha256:160d15927aa9ade677ba48332cdf0a19f645ba1ba0c630a8a7f6a12701c1849b"},
+    {file = "pytoncenter-0.0.12-py3-none-any.whl", hash = "sha256:063060f483cdce4ebefcfa23ac48046df83613ad6519ad4b810910ad57e1756c"},
+    {file = "pytoncenter-0.0.12.tar.gz", hash = "sha256:6308872e4f6187b2c949a3379b8ea042fa21e182d410aa9b63beaf888ecbbaab"},
 ]
 
 [package.dependencies]
@@ -1441,4 +1441,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "12c41b9cd59b0b2c56f5abf07c7f2ac3bb384ac18535c1b9c55c192947d5bb0b"
+content-hash = "0e7eea1a20410c75ae764b5b0c0e1f4f58870be892f35aee8e9013a80ae092c5"
