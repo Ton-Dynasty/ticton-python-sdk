@@ -1018,13 +1018,13 @@ cli = ["click (>=5.0)"]
 
 [[package]]
 name = "pytoncenter"
-version = "0.0.12"
+version = "0.0.13"
 description = ""
 optional = false
 python-versions = ">=3.9,<3.12"
 files = [
-    {file = "pytoncenter-0.0.12-py3-none-any.whl", hash = "sha256:063060f483cdce4ebefcfa23ac48046df83613ad6519ad4b810910ad57e1756c"},
-    {file = "pytoncenter-0.0.12.tar.gz", hash = "sha256:6308872e4f6187b2c949a3379b8ea042fa21e182d410aa9b63beaf888ecbbaab"},
+    {file = "pytoncenter-0.0.13-py3-none-any.whl", hash = "sha256:5808e927454304aaa739332d94f7f303ba5058b658012f446c163cbdd681d3b5"},
+    {file = "pytoncenter-0.0.13.tar.gz", hash = "sha256:d63b49dd098656fd20950917521fd155c1f3abcf91fd9765249c9928d98c27f0"},
 ]
 
 [package.dependencies]
@@ -1033,7 +1033,7 @@ aiolimiter = ">=1.1.0,<2.0.0"
 click = ">=8.1.7,<9.0.0"
 deprecated = ">=1.2.14,<2.0.0"
 pre-commit = ">=3.6.1,<4.0.0"
-pydantic = ">=2.6.1,<3.0.0"
+pydantic = ">=2.5.3,<3.0.0"
 pyfiglet = ">=1.0.2,<2.0.0"
 pynacl = ">=1.5.0,<2.0.0"
 tonpy = ">=0.0.0.1.2b0,<0.0.1.0.0"
@@ -1441,4 +1441,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "0e7eea1a20410c75ae764b5b0c0e1f4f58870be892f35aee8e9013a80ae092c5"
+content-hash = "30db688a5a4c23ac0188bfb155a08b0102e43c45b6ff60d13f3f24911fd00ed8"
