@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   export-requirements-txt:
     runs-on: ubuntu-latest
@@ -14,3 +17,9 @@ jobs:
         with:
           without-hashes: true
           outfile-name: requirements.txt
+      - name: Commit report
+        run: |
+          git config --global user.name 'alan890104'
+          git config --global user.email 'alan890104@users.noreply.github.com'
+          git commit -am "Sync requirements.txt from poetry.lock"
+          git push
