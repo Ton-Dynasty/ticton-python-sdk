@@ -247,6 +247,20 @@ class TicTonAsyncClient:
             warnings.warn("your quote asset balance is not found")
             quote_asset_balance = Decimal(0)
 
+    async def _dry_run(
+        self, to_address: str, amount: int, seqno: int, body: Cell
+    ) -> bytearray:
+        self.assert_wallet_exists()
+        query = self.wallet.create_transfer_message(
+            to_addr=to_address,
+            amount=amount,
+            seqno=seqno,
+            payload=body,
+        )
+        boc: bytearray = query["message"].to_boc(False)
+
+        return boc
+
     async def _send(
         self,
         to_address: str,
@@ -269,14 +283,8 @@ class TicTonAsyncClient:
         dry_run : bool
             Whether to call toncenter simulation api or not
         """
-        self.assert_wallet_exists()
-        query = self.wallet.create_transfer_message(
-            to_addr=to_address,
-            amount=amount,
-            seqno=seqno,
-            payload=body,
-        )
-        boc: bytearray = query["message"].to_boc(False)
+        boc = await self._dry_run(to_address, amount, seqno, body)
+
         result = await self.toncenter.send_message(
             ExternalMessage(boc=bytes_to_b64str(boc))
         )
@@ -396,7 +404,13 @@ class TicTonAsyncClient:
         return alarm_dict
 
     async def tick(
-        self, price: float, *, timeout: int = 1000, extra_ton: float = 0.1, **kwargs
+        self,
+        price: float,
+        *,
+        timeout: int = 1000,
+        extra_ton: float = 0.1,
+        dry_run: bool = False,
+        **kwargs,
     ):
         """
         tick will open a position with the given price and timeout, the total amount
@@ -477,6 +491,14 @@ class TicTonAsyncClient:
         assert jetton_wallet is not None, "jetton wallet does not found"
         assert wallet_info.seqno is not None, "seqno is not found"
 
+        if dry_run:
+            return await self._dry_run(
+                to_address=jetton_wallet.address.to_string(),  # type: ignore
+                amount=forward_ton_amount + gas_fee,
+                seqno=wallet_info.seqno,
+                body=body,
+            )
+
         result = await self._send(
             to_address=jetton_wallet.address.to_string(),  # type: ignore
             amount=forward_ton_amount + gas_fee,
@@ -498,7 +520,7 @@ class TicTonAsyncClient:
 
         return result
 
-    async def ring(self, alarm_id: int, **kwargs):
+    async def ring(self, alarm_id: int, dry_run: bool = False, **kwargs):
         """
         ring will close the position with the given alarm_id
 
@@ -530,6 +552,15 @@ class TicTonAsyncClient:
             .store_uint(alarm_id, 257)
             .end_cell()
         )  # query_id cannot be 0
+
+        if dry_run:
+            return await self._dry_run(
+                to_address=self.oracle.to_string(),
+                amount=gas_fee,
+                seqno=wallet.seqno,
+                body=body,
+            )
+
         result = await self._send(
             to_address=self.oracle.to_string(),
             amount=gas_fee,
@@ -551,6 +582,7 @@ class TicTonAsyncClient:
         skip_estimate: float = False,
         need_quote_asset: Optional[Decimal] = None,
         need_base_asset: Optional[Decimal] = None,
+        dry_run: bool = False,
         **kwargs,
     ):
         """
@@ -638,6 +670,14 @@ class TicTonAsyncClient:
         )
 
         assert jetton_wallet is not None, "jetton wallet does not found"
+
+        if dry_run:
+            return await self._dry_run(
+                to_address=jetton_wallet.address.to_string(),  # type: ignore
+                amount=int(need_base_asset) + gas_fee,
+                seqno=wallet.seqno,
+                body=body,
+            )
 
         result = await self._send(
             to_address=jetton_wallet.address.to_string(),  # type: ignore
