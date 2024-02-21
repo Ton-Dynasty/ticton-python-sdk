@@ -1,65 +1,52 @@
 from __future__ import annotations
-from decimal import Decimal
-import logging
+
 import asyncio
+import logging
 import time
 import warnings
-from pydantic import BaseModel, Field
-from pytoncenter.utils import get_opcode
-
-from tonsdk.utils import bytes_to_b64str
-from tonsdk.boc import Cell, begin_cell
-from tonsdk.contract.wallet import Wallets
-from tonpy import CellSlice
-from typing import (
-    Any,
-    Coroutine,
-    Dict,
-    Tuple,
-    Optional,
-    Literal,
-    Callable,
-    List,
-    Type,
-    Union,
-)
-from .arithmetic import FixedFloat, to_token, token_to_float
-from .callbacks import (
-    OnTickSuccessParams,
-    OnWindSuccessParams,
-    OnRingSuccessParams,
-    handle_noop,
-    handle_chime,
-    handle_chronoshift,
-    handle_notification,
-)
-from pytoncenter.extension.message import JettonMessage
-from .parser import TicTonMessage
+from decimal import Decimal
 from os import getenv
+from typing import Any, Callable, Coroutine, List, Literal, Optional, Tuple, Type, Union
 
-
-from pytoncenter import get_client, AsyncTonCenterClientV3
+from pydantic import BaseModel, Field
+from pytoncenter import AsyncTonCenterClientV3, get_client
+from pytoncenter.address import Address as PyAddress
+from pytoncenter.extension.message import JettonMessage
+from pytoncenter.utils import get_opcode
 from pytoncenter.v3.models import (
     AddressLike,
-    RunGetMethodRequest,
-    GetAccountRequest,
-    GetBlockRequest,
-    GetMethodParameterInput,
-    GetWalletRequest,
-    GetTransactionsRequest,
-    GetSpecifiedJettonWalletRequest,
     ExternalMessage,
+    GetAccountRequest,
+    GetMethodParameterInput,
+    GetSpecifiedJettonWalletRequest,
+    GetTransactionsRequest,
+    GetWalletRequest,
+    RunGetMethodRequest,
 )
-from pytoncenter.address import Address as PyAddress
+from tonpy import CellSlice
+from tonsdk.boc import Cell, begin_cell
+from tonsdk.contract.wallet import Wallets
+from tonsdk.utils import bytes_to_b64str
+
+from .arithmetic import FixedFloat, to_token, token_to_float
+from .callbacks import (
+    OnRingSuccessParams,
+    OnTickSuccessParams,
+    OnWindSuccessParams,
+    handle_chime,
+    handle_chronoshift,
+    handle_noop,
+    handle_notification,
+)
 from .decoder import (
-    OracleMetadata,
-    OracleMetadataDecoder,
+    AlarmAddressDecoder,
     AlarmMetadata,
     AlarmMetadataDecoder,
-    AlarmAddressDecoder,
-    EstimateData,
     EstimateDataDecoder,
+    OracleMetadata,
+    OracleMetadataDecoder,
 )
+from .parser import TicTonMessage
 
 __all__ = ["TicTonAsyncClient"]
 
@@ -143,7 +130,11 @@ class TicTonAsyncClient:
         )
 
     @classmethod
-    async def get_oracle_metadata(cls: Type[TicTonAsyncClient], toncenter: AsyncTonCenterClientV3, oracle_addr: str) -> OracleMetadata:
+    async def get_oracle_metadata(
+        cls: Type[TicTonAsyncClient],
+        toncenter: AsyncTonCenterClientV3,
+        oracle_addr: str,
+    ) -> OracleMetadata:
         result = await toncenter.run_get_method(RunGetMethodRequest(address=oracle_addr, method="getOracleData", stack=[]))
         return OracleMetadataDecoder().decode(result)
 
@@ -207,10 +198,14 @@ class TicTonAsyncClient:
             ),
         )
 
-        assert isinstance(base_asset_balance, Decimal), "base_asset_balance is not Decimal"
-        assert isinstance(quote_asset_balance, Decimal), "quote_asset_balance is not Decimal"
+        if isinstance(base_asset_balance, AssertionError):
+            warnings.warn(f"your base asset balance is not found. reason: {base_asset_balance}")
+            base_asset_balance = Decimal(0)
+        if isinstance(quote_asset_balance, AssertionError):
+            warnings.warn(f"your quote asset balance is not found. reason: {quote_asset_balance}")
+            quote_asset_balance = Decimal(0)
 
-        return (base_asset_balance, quote_asset_balance)
+        return base_asset_balance, quote_asset_balance
 
     async def _send(
         self,
