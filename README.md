@@ -199,6 +199,7 @@ await client.subscribe(on_tick_success, on_ring_success, on_wind_success)
 
     ``` bash
     poetry self add poetry-bumpversion
+    poetry self add poetry-plugin-export
     ```
 
 3. Install dependencies
