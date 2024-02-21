@@ -22,8 +22,4 @@ jobs:
           git config --global user.name 'alan890104'
           git config --global user.email 'alan890104@users.noreply.github.com'
           git add requirements.txt
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Sync requirements.txt from poetry.lock"
-          git push
+          git diff --quiet && git diff --staged --quiet || (git commit -am "Sync requirements.txt from poetry.lock" && git push)
