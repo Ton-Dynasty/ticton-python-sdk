@@ -251,9 +251,11 @@ class TicTonAsyncClient:
             )
             quote_asset_balance = Decimal(0)
 
+        return base_asset_balance, quote_asset_balance
+
     async def _dry_run(
         self, to_address: str, amount: int, seqno: int, body: Cell
-    ) -> bytearray:
+    ) -> str:
         self.assert_wallet_exists()
         query = self.wallet.create_transfer_message(
             to_addr=to_address,
@@ -261,7 +263,7 @@ class TicTonAsyncClient:
             seqno=seqno,
             payload=body,
         )
-        boc: bytearray = query["message"].to_boc(False)
+        boc: str = bytes_to_b64str(query["message"].to_boc(False))
 
         return boc
 
@@ -289,9 +291,7 @@ class TicTonAsyncClient:
         """
         boc = await self._dry_run(to_address, amount, seqno, body)
 
-        result = await self.toncenter.send_message(
-            ExternalMessage(boc=bytes_to_b64str(boc))
-        )
+        result = await self.toncenter.send_message(ExternalMessage(boc=boc))
         return result
 
     async def _estimate_from_oracle_get_method(
