@@ -246,6 +246,8 @@ class TicTonAsyncClient:
         if isinstance(quote_asset_balance, TonCenterException):
             warnings.warn("your quote asset balance is not found")
             quote_asset_balance = Decimal(0)
+        
+        return base_asset_balance, quote_asset_balance
 
     async def _send(
         self,
