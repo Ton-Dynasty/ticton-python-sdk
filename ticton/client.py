@@ -240,13 +240,17 @@ class TicTonAsyncClient:
             ),
         )
 
-        if isinstance(base_asset_balance, TonCenterException):
-            warnings.warn("your base asset balance is not found")
+        if isinstance(base_asset_balance, AssertionError):
+            warnings.warn(
+                f"your base asset balance is not found. reason: {base_asset_balance}"
+            )
             base_asset_balance = Decimal(0)
-        if isinstance(quote_asset_balance, TonCenterException):
-            warnings.warn("your quote asset balance is not found")
+        if isinstance(quote_asset_balance, AssertionError):
+            warnings.warn(
+                f"your quote asset balance is not found. reason: {quote_asset_balance}"
+            )
             quote_asset_balance = Decimal(0)
-        
+
         return base_asset_balance, quote_asset_balance
 
     async def _send(
