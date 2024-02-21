@@ -6,7 +6,18 @@ import time
 import warnings
 from decimal import Decimal
 from os import getenv
-from typing import Any, Callable, Coroutine, List, Literal, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    overload,
+)
 
 from pydantic import BaseModel, Field
 from pytoncenter import AsyncTonCenterClientV3, get_client
@@ -22,6 +33,7 @@ from pytoncenter.v3.models import (
     GetTransactionsRequest,
     GetWalletRequest,
     RunGetMethodRequest,
+    SentMessage,
 )
 from tonpy import CellSlice
 from tonsdk.boc import Cell, begin_cell
@@ -207,9 +219,7 @@ class TicTonAsyncClient:
 
         return base_asset_balance, quote_asset_balance
 
-    async def _dry_run(
-        self, to_address: str, amount: int, seqno: int, body: Cell
-    ) -> str:
+    async def _dry_run(self, to_address: str, amount: int, seqno: int, body: Cell) -> str:
         self.assert_wallet_exists()
         query = self.wallet.create_transfer_message(
             to_addr=to_address,
@@ -346,6 +356,18 @@ class TicTonAsyncClient:
 
         return alarm_dict
 
+    @overload
+    async def tick(self, price: float, dry_run: Literal[False] = False, *, timeout: int = 1000, extra_ton: float = 0.1, **kwargs) -> SentMessage:
+        """
+        Sending a tick message to the oracle, return message hash
+        """
+
+    @overload
+    async def tick(self, price: float, dry_run: Literal[True] = True, *, timeout: int = 1000, extra_ton: float = 0.1, **kwargs) -> str:
+        """
+        Sending a tick message to the oracle in dry_run mode, return message boc
+        """
+
     async def tick(
         self,
         price: float,
@@ -445,6 +467,18 @@ class TicTonAsyncClient:
 
         return result
 
+    @overload
+    async def ring(self, alarm_id: int, dry_run: Literal[False] = False, **kwargs) -> SentMessage:
+        """
+        ring will close the position with the given alarm_id
+        """
+
+    @overload
+    async def ring(self, alarm_id: int, dry_run: Literal[True] = True, **kwargs) -> str:
+        """
+        ring will close the position with the given alarm_id in dry_run mode
+        """
+
     async def ring(self, alarm_id: int, dry_run: bool = False, **kwargs):
         """
         ring will close the position with the given alarm_id
@@ -468,13 +502,7 @@ class TicTonAsyncClient:
         wallet = await self.toncenter.get_wallet(GetWalletRequest(address=self.wallet.address.to_string()))
         assert wallet.seqno is not None, "Ring: seqno is not found in wallet info"
         gas_fee = int(0.35 * 10**9)
-        body = (
-            begin_cell()
-            .store_uint(0xC3510A29, 32)
-            .store_uint(1, 257)
-            .store_uint(alarm_id, 257)
-            .end_cell()
-        )  # query_id cannot be 0
+        body = begin_cell().store_uint(0xC3510A29, 32).store_uint(1, 257).store_uint(alarm_id, 257).end_cell()  # query_id cannot be 0
 
         if dry_run:
             return await self._dry_run(
@@ -496,6 +524,38 @@ class TicTonAsyncClient:
         self.logger.info(log_info)
 
         return result
+
+    @overload
+    async def wind(
+        self,
+        alarm_id: int,
+        buy_num: int,
+        new_price: float,
+        skip_estimate: bool = False,
+        need_quote_asset: Optional[Decimal] = None,
+        need_base_asset: Optional[Decimal] = None,
+        dry_run: Literal[False] = False,
+        **kwargs,
+    ) -> SentMessage:
+        """
+        wind will arbitrage the position with the given alarm_id, buy_num and new_price, return message hash
+        """
+
+    @overload
+    async def wind(
+        self,
+        alarm_id: int,
+        buy_num: int,
+        new_price: float,
+        skip_estimate: bool = False,
+        need_quote_asset: Optional[Decimal] = None,
+        need_base_asset: Optional[Decimal] = None,
+        dry_run: Literal[True] = True,
+        **kwargs,
+    ) -> str:
+        """
+        wind will arbitrage the position with the given alarm_id, buy_num and new_price in dry_run mode, return message boc
+        """
 
     async def wind(
         self,
