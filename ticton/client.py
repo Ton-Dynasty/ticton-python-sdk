@@ -1,66 +1,52 @@
 from __future__ import annotations
-from decimal import Decimal
-import logging
+
 import asyncio
+import logging
 import time
 import warnings
-from pydantic import BaseModel, Field
-from pytoncenter.utils import get_opcode
-from pytoncenter.v3.api import TonCenterException
-
-from tonsdk.utils import bytes_to_b64str
-from tonsdk.boc import Cell, begin_cell
-from tonsdk.contract.wallet import Wallets
-from tonpy import CellSlice
-from typing import (
-    Any,
-    Coroutine,
-    Dict,
-    Tuple,
-    Optional,
-    Literal,
-    Callable,
-    List,
-    Type,
-    Union,
-)
-from .arithmetic import FixedFloat, to_token, token_to_float
-from .callbacks import (
-    OnTickSuccessParams,
-    OnWindSuccessParams,
-    OnRingSuccessParams,
-    handle_noop,
-    handle_chime,
-    handle_chronoshift,
-    handle_notification,
-)
-from pytoncenter.extension.message import JettonMessage
-from .parser import TicTonMessage
+from decimal import Decimal
 from os import getenv
+from typing import Any, Callable, Coroutine, List, Literal, Optional, Tuple, Type, Union
 
-
-from pytoncenter import get_client, AsyncTonCenterClientV3
+from pydantic import BaseModel, Field
+from pytoncenter import AsyncTonCenterClientV3, get_client
+from pytoncenter.address import Address as PyAddress
+from pytoncenter.extension.message import JettonMessage
+from pytoncenter.utils import get_opcode
 from pytoncenter.v3.models import (
     AddressLike,
-    RunGetMethodRequest,
-    GetAccountRequest,
-    GetBlockRequest,
-    GetMethodParameterInput,
-    GetWalletRequest,
-    GetTransactionsRequest,
-    GetSpecifiedJettonWalletRequest,
     ExternalMessage,
+    GetAccountRequest,
+    GetMethodParameterInput,
+    GetSpecifiedJettonWalletRequest,
+    GetTransactionsRequest,
+    GetWalletRequest,
+    RunGetMethodRequest,
 )
-from pytoncenter.address import Address as PyAddress
+from tonpy import CellSlice
+from tonsdk.boc import Cell, begin_cell
+from tonsdk.contract.wallet import Wallets
+from tonsdk.utils import bytes_to_b64str
+
+from .arithmetic import FixedFloat, to_token, token_to_float
+from .callbacks import (
+    OnRingSuccessParams,
+    OnTickSuccessParams,
+    OnWindSuccessParams,
+    handle_chime,
+    handle_chronoshift,
+    handle_noop,
+    handle_notification,
+)
 from .decoder import (
-    OracleMetadata,
-    OracleMetadataDecoder,
+    AlarmAddressDecoder,
     AlarmMetadata,
     AlarmMetadataDecoder,
-    AlarmAddressDecoder,
-    EstimateData,
     EstimateDataDecoder,
+    OracleMetadata,
+    OracleMetadataDecoder,
 )
+from .parser import TicTonMessage
 
 __all__ = ["TicTonAsyncClient"]
 
@@ -70,12 +56,8 @@ class SubscribeParam(BaseModel):
         default=None,
         description="The lt to start from, if None, the oldest lt will be used",
     )
-    interval: float = Field(
-        default=2.0, description="The interval of the subscription in seconds"
-    )
-    limit: int = Field(
-        default=256, ge=1, le=256, description="The limit of the subscription"
-    )
+    interval: float = Field(default=2.0, description="The interval of the subscription in seconds")
+    limit: int = Field(default=256, ge=1, le=256, description="The limit of the subscription")
     offset: int = Field(default=0, ge=0, description="The offset of the subscription")
     account: AddressLike = Field(..., description="The account to subscribe to")
 
@@ -87,9 +69,7 @@ class TicTonAsyncClient:
         toncenter: AsyncTonCenterClientV3,
         oracle_addr: AddressLike,
         mnemonics: Optional[str] = None,
-        wallet_version: Literal[
-            "v2r1", "v2r2", "v3r1", "v3r2", "v4r1", "v4r2", "hv2"
-        ] = "v4r2",
+        wallet_version: Literal["v2r1", "v2r2", "v3r1", "v3r2", "v4r1", "v4r2", "hv2"] = "v4r2",
         threshold_price: float = 0.7,
         *,
         logger: Optional[logging.Logger] = None,
@@ -118,9 +98,7 @@ class TicTonAsyncClient:
         mnemonics: Optional[str] = None,
         oracle_addr: Optional[str] = None,
         toncenter_api_key: Optional[str] = None,
-        wallet_version: Literal[
-            "v2r1", "v2r2", "v3r1", "v3r2", "v4r1", "v4r2", "hv2"
-        ] = "v4r2",
+        wallet_version: Literal["v2r1", "v2r2", "v3r1", "v3r2", "v4r1", "v4r2", "hv2"] = "v4r2",
         threshold_price: float = 0.01,
         *,
         testnet: bool = True,
@@ -131,9 +109,7 @@ class TicTonAsyncClient:
         oracle_addr_str = getenv("TICTON_ORACLE_ADDRESS", oracle_addr)
         toncenter_api_key = getenv("TICTON_TONCENTER_API_KEY", toncenter_api_key)
         threshold_price = float(getenv("TICTON_THRESHOLD_PRICE", threshold_price))
-        assert (
-            oracle_addr_str is not None
-        ), "oracle_addr must be provided, you can either pass it as a parameter or set TICTON_ORACLE_ADDRESS environment variable"
+        assert oracle_addr_str is not None, "oracle_addr must be provided, you can either pass it as a parameter or set TICTON_ORACLE_ADDRESS environment variable"
 
         toncenter = get_client(
             version="v3",
@@ -159,15 +135,11 @@ class TicTonAsyncClient:
         toncenter: AsyncTonCenterClientV3,
         oracle_addr: str,
     ) -> OracleMetadata:
-        result = await toncenter.run_get_method(
-            RunGetMethodRequest(address=oracle_addr, method="getOracleData", stack=[])
-        )
+        result = await toncenter.run_get_method(RunGetMethodRequest(address=oracle_addr, method="getOracleData", stack=[]))
         return OracleMetadataDecoder().decode(result)
 
     async def sync_oracle_metadata(self):
-        self.metadata = await self.get_oracle_metadata(
-            self.toncenter, self.oracle.to_string()
-        )
+        self.metadata = await self.get_oracle_metadata(self.toncenter, self.oracle.to_string())
 
     async def _convert_price(self, price: float) -> FixedFloat:
         """
@@ -175,22 +147,14 @@ class TicTonAsyncClient:
         """
         assert price > 0, "price must be greater than 0"
         price = float(price)
-        return (
-            FixedFloat(price)
-            * 10**self.metadata.quote_asset_decimals
-            / 10**self.metadata.base_asset_decimals
-        )
+        return FixedFloat(price) * 10**self.metadata.quote_asset_decimals / 10**self.metadata.base_asset_decimals
 
     async def _convert_fixedfloat_to_price(self, price: FixedFloat) -> float:
         """
         Adjusts the given price by scaling it to match the decimal difference between the quote and base assets in a token pair.
         """
         assert isinstance(price, FixedFloat), "price must be a FixedFloat"
-        return (
-            price.to_float()
-            * 10**self.metadata.base_asset_decimals
-            / 10**self.metadata.quote_asset_decimals
-        )
+        return price.to_float() * 10**self.metadata.base_asset_decimals / 10**self.metadata.quote_asset_decimals
 
     def assert_wallet_exists(self):
         assert hasattr(self, "wallet"), "wallet is not found"
@@ -208,16 +172,10 @@ class TicTonAsyncClient:
         """
         self.assert_wallet_exists()
 
-        async def _get_balance(
-            master_address: PyAddress, account_address: PyAddress
-        ) -> Decimal:
+        async def _get_balance(master_address: PyAddress, account_address: PyAddress) -> Decimal:
 
-            if master_address == PyAddress(
-                "0:0000000000000000000000000000000000000000000000000000000000000000"
-            ):
-                account = await self.toncenter.get_account(
-                    GetAccountRequest(address=account_address.to_string())
-                )
+            if master_address == PyAddress("0:0000000000000000000000000000000000000000000000000000000000000000"):
+                account = await self.toncenter.get_account(GetAccountRequest(address=account_address.to_string()))
                 return Decimal(account.balance)
             else:
                 jetton = await self.toncenter.get_jetton_wallets(
@@ -241,14 +199,10 @@ class TicTonAsyncClient:
         )
 
         if isinstance(base_asset_balance, AssertionError):
-            warnings.warn(
-                f"your base asset balance is not found. reason: {base_asset_balance}"
-            )
+            warnings.warn(f"your base asset balance is not found. reason: {base_asset_balance}")
             base_asset_balance = Decimal(0)
         if isinstance(quote_asset_balance, AssertionError):
-            warnings.warn(
-                f"your quote asset balance is not found. reason: {quote_asset_balance}"
-            )
+            warnings.warn(f"your quote asset balance is not found. reason: {quote_asset_balance}")
             quote_asset_balance = Decimal(0)
 
         return base_asset_balance, quote_asset_balance
@@ -351,9 +305,7 @@ class TicTonAsyncClient:
             can_buy,
             need_base_asset,
             need_quote_asset,
-        ) = await self._estimate_from_oracle_get_method(
-            alarm_address.to_string(), buy_num, int(new_price_ff.raw_value)
-        )
+        ) = await self._estimate_from_oracle_get_method(alarm_address.to_string(), buy_num, int(new_price_ff.raw_value))
 
         return (
             can_buy,
@@ -363,10 +315,7 @@ class TicTonAsyncClient:
 
     async def _can_afford(self, need_base_asset: Decimal, need_quote_asset: Decimal):
         base_asset_balance, quote_asset_balance = await self._get_user_balance()
-        if (
-            need_base_asset > base_asset_balance
-            or need_quote_asset > quote_asset_balance
-        ):
+        if need_base_asset > base_asset_balance or need_quote_asset > quote_asset_balance:
             warnings.warn(
                 f"expected base asset: {need_base_asset / 10 ** self.metadata.base_asset_decimals}, quote asset: {need_quote_asset / 10 ** self.metadata.quote_asset_decimals}, but got base asset: {base_asset_balance/ 10 ** self.metadata.base_asset_decimals}, quote asset: {quote_asset_balance/ 10 ** self.metadata.quote_asset_decimals}"
             )
@@ -377,30 +326,20 @@ class TicTonAsyncClient:
         """
         get the alarm info
         """
-        result = await self.toncenter.run_get_method(
-            RunGetMethodRequest(
-                address=alarm_address.to_string(), method="getAlarmMetadata", stack=[]
-            )
-        )
+        result = await self.toncenter.run_get_method(RunGetMethodRequest(address=alarm_address.to_string(), method="getAlarmMetadata", stack=[]))
         return AlarmMetadataDecoder().decode(result)  # type: ignore
 
     async def check_alarms(self, alarm_id_list: List[int]):
         self.logger.info("Checking Alarms State")
 
-        address_list = await self.toncenter.multicall(
-            [self.get_alarm_address(alarm_id) for alarm_id in alarm_id_list]
-        )
+        address_list = await self.toncenter.multicall([self.get_alarm_address(alarm_id) for alarm_id in alarm_id_list])
 
         # get alarm state
-        state_list = await self.toncenter.multicall(
-            [self.get_address_state(address) for address in address_list]
-        )
+        state_list = await self.toncenter.multicall([self.get_address_state(address) for address in address_list])
 
         # update alarm dict
         alarm_dict = {}
-        for alarm_id, alarm_address, alarm_state in zip(
-            alarm_id_list, address_list, state_list
-        ):
+        for alarm_id, alarm_address, alarm_state in zip(alarm_id_list, address_list, state_list):
             alarm_dict[alarm_id] = {}
             alarm_dict[alarm_id]["state"] = alarm_state
             alarm_dict[alarm_id]["address"] = alarm_address
@@ -445,32 +384,18 @@ class TicTonAsyncClient:
         expire_at = int(time.time()) + timeout
         price = round(price, self.metadata.quote_asset_decimals)
         base_asset_price = await self._convert_price(price)
-        quote_asset_transfered = FixedFloat(
-            to_token(price, self.metadata.quote_asset_decimals)
-        )
-        forward_ton_amount = quote_asset_transfered / base_asset_price + to_token(
-            extra_ton, self.metadata.base_asset_decimals
-        )
+        quote_asset_transfered = FixedFloat(to_token(price, self.metadata.quote_asset_decimals))
+        forward_ton_amount = quote_asset_transfered / base_asset_price + to_token(extra_ton, self.metadata.base_asset_decimals)
         base_asset_price = int(base_asset_price.raw_value)
         quote_asset_transfered = quote_asset_transfered.to_float()
         forward_ton_amount = int(round(forward_ton_amount.to_float(), 0))
         gas_fee = int(0.13 * 10**9)
 
-        can_afford = await self._can_afford(
-            Decimal(forward_ton_amount + gas_fee), Decimal(quote_asset_transfered)
-        )
+        can_afford = await self._can_afford(Decimal(forward_ton_amount + gas_fee), Decimal(quote_asset_transfered))
         assert can_afford, "no enough balance"
-        forward_info = (
-            begin_cell()
-            .store_uint(0, 8)
-            .store_uint(expire_at, 256)
-            .store_uint(base_asset_price, 256)
-            .end_cell()
-        )
+        forward_info = begin_cell().store_uint(0, 8).store_uint(expire_at, 256).store_uint(base_asset_price, 256).end_cell()
 
-        wallet_info = await self.toncenter.get_wallet(
-            GetWalletRequest(address=self.wallet.address.to_string())
-        )
+        wallet_info = await self.toncenter.get_wallet(GetWalletRequest(address=self.wallet.address.to_string()))
 
         body = (
             begin_cell()
@@ -512,14 +437,10 @@ class TicTonAsyncClient:
 
         args = [
             price,
-            token_to_float(
-                forward_ton_amount + gas_fee, self.metadata.base_asset_decimals
-            ),
+            token_to_float(forward_ton_amount + gas_fee, self.metadata.base_asset_decimals),
             token_to_float(quote_asset_transfered, self.metadata.quote_asset_decimals),
         ]
-        log_info = (
-            "Tick message successfully sent, tick price: {}, spend base asset: {}, spend quote asset: {}"
-        ).format(*args)
+        log_info = ("Tick message successfully sent, tick price: {}, spend base asset: {}, spend quote asset: {}").format(*args)
         self.logger.info(log_info)
 
         return result
@@ -544,9 +465,7 @@ class TicTonAsyncClient:
         alarm_address = await self.get_alarm_address(alarm_id)
         alarm_state = await self.get_address_state(alarm_address)
         assert alarm_state == "active", "Ring: alarm is not exist"
-        wallet = await self.toncenter.get_wallet(
-            GetWalletRequest(address=self.wallet.address.to_string())
-        )
+        wallet = await self.toncenter.get_wallet(GetWalletRequest(address=self.wallet.address.to_string()))
         assert wallet.seqno is not None, "Ring: seqno is not found in wallet info"
         gas_fee = int(0.35 * 10**9)
         body = (
@@ -622,36 +541,21 @@ class TicTonAsyncClient:
             assert need_base_asset is not None, "need_base_asset must be provided"
             assert need_quote_asset is not None, "need_quote_asset must be provided"
         else:
-            can_buy, need_asset_tup, _ = await self._estimate_wind(
-                alarm_id, buy_num, new_price
-            )
+            can_buy, need_asset_tup, _ = await self._estimate_wind(alarm_id, buy_num, new_price)
             assert can_buy, "Buy num is too large"
-            assert (
-                need_asset_tup is not None
-            ), "The price difference is smaller than threshold price"
+            assert need_asset_tup is not None, "The price difference is smaller than threshold price"
 
             need_base_asset, need_quote_asset = need_asset_tup
 
-        wallet = await self.toncenter.get_wallet(
-            GetWalletRequest(address=self.wallet.address.to_string())
-        )
+        wallet = await self.toncenter.get_wallet(GetWalletRequest(address=self.wallet.address.to_string()))
         assert wallet.seqno is not None, "seqno is not found in wallet info"
 
         gas_fee = int(0.5 * 10**9)
 
-        can_afford = await self._can_afford(
-            Decimal(need_base_asset + gas_fee), need_quote_asset
-        )
+        can_afford = await self._can_afford(Decimal(need_base_asset + gas_fee), need_quote_asset)
         assert can_afford, "not enough balance"
 
-        forward_info = (
-            begin_cell()
-            .store_uint(1, 8)
-            .store_uint(alarm_id, 256)
-            .store_uint(buy_num, 32)
-            .store_uint(int(new_price_ff.raw_value), 256)
-            .end_cell()
-        )
+        forward_info = begin_cell().store_uint(1, 8).store_uint(alarm_id, 256).store_uint(buy_num, 32).store_uint(int(new_price_ff.raw_value), 256).end_cell()
 
         body = (
             begin_cell()
@@ -697,9 +601,7 @@ class TicTonAsyncClient:
             token_to_float(need_base_asset, self.metadata.base_asset_decimals),
             token_to_float(need_quote_asset, self.metadata.quote_asset_decimals),
         ]
-        log_info = (
-            "Wind message successfully sent, alarm id: {}, buy num: {}, wind price: {}, spend base asset: {}, spend quote asset: {}"
-        ).format(*args)
+        log_info = ("Wind message successfully sent, alarm id: {}, buy num: {}, wind price: {}, spend base asset: {}, spend quote asset: {}").format(*args)
         self.logger.info(log_info)
 
         return result
@@ -738,15 +640,9 @@ class TicTonAsyncClient:
 
     async def subscribe(
         self,
-        on_tick_success: Callable[
-            [OnTickSuccessParams], Coroutine[Any, Any, None]
-        ] = handle_noop,
-        on_wind_success: Callable[
-            [OnWindSuccessParams], Coroutine[Any, Any, None]
-        ] = handle_noop,
-        on_ring_success: Callable[
-            [OnRingSuccessParams], Coroutine[Any, Any, None]
-        ] = handle_noop,
+        on_tick_success: Callable[[OnTickSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_wind_success: Callable[[OnWindSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_ring_success: Callable[[OnRingSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
         start_lt: Union[int, Literal["latest", "oldest"]] = "oldest",
         interval: Union[int, float] = 2.0,
         *,

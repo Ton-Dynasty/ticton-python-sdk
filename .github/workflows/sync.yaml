@@ -1,7 +1,6 @@
 name: poetry export requirements.txt
 
 on:
-  pull_request:
   push:
     branches: [main]
 
@@ -22,5 +21,4 @@ jobs:
           git config --global user.name 'alan890104'
           git config --global user.email 'alan890104@users.noreply.github.com'
           git add requirements.txt
-          git commit -am "Sync requirements.txt from poetry.lock"
-          git push
+          git diff --quiet && git diff --staged --quiet || (git commit -am "Sync requirements.txt from poetry.lock" && git push)
