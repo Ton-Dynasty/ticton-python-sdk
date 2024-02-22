@@ -1,8 +1,9 @@
 from __future__ import annotations
-from pytoncenter.decoder import BaseDecoder, Decoder, Types, GetMethodResultType
-from pytoncenter.v3.models import AddressLike
-from pytoncenter.address import Address
+
 from pydantic import BaseModel
+from pytoncenter.address import Address
+from pytoncenter.decoder import BaseDecoder, Decoder, GetMethodResultType, Types
+from pytoncenter.v3.models import AddressLike
 
 
 class OracleMetadata(BaseModel):
@@ -35,6 +36,10 @@ class EstimateData(BaseModel):
     can_buy: bool
     need_baseAsset_amount: int
     need_quote_asset_amount: int
+
+
+class JettonWalletAddress(BaseModel):
+    wallet_address: AddressLike
 
 
 class OracleMetadataDecoder(BaseDecoder):
@@ -123,3 +128,20 @@ class EstimateDataDecoder(BaseDecoder):
     def decode(self, data: GetMethodResultType) -> EstimateData:
         result = self.decoder.decode(data)
         return EstimateData(**result)
+
+
+class JettonWalletAddressDecoder(BaseDecoder):
+    decoder = Decoder(
+        Types.Address("wallet_address"),
+    )
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(JettonWalletAddressDecoder, cls).__new__(cls)
+        return cls._instance
+
+    def decode(self, data: GetMethodResultType) -> JettonWalletAddress:
+        result = self.decoder.decode(data)
+        return JettonWalletAddress(**result)
