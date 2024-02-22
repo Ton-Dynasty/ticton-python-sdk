@@ -202,7 +202,7 @@ class TicTonAsyncClient:
     def assert_wallet_exists(self):
         assert self.wallet is not None, "if you want to run tick, ring, or wind, you must provide the mnemonics. Otherwise, only dry_run mode is available."
 
-    async def _get_user_balance(self, owner_address: str) -> Tuple[Decimal, Decimal]:
+    async def _get_user_balance(self, owner_address: AddressLike) -> Tuple[Decimal, Decimal]:
         """
         get the user's balance of baseAsset and quoteAsset in nanoTON
 
@@ -347,7 +347,7 @@ class TicTonAsyncClient:
             alarm_metadata,
         )
 
-    async def _must_afford(self, wallet_address: str, need_base_asset: Decimal, need_quote_asset: Decimal):
+    async def _must_afford(self, wallet_address: AddressLike, need_base_asset: Decimal, need_quote_asset: Decimal):
         base_asset_balance, quote_asset_balance = await self._get_user_balance(wallet_address)
         if need_base_asset > base_asset_balance or need_quote_asset > quote_asset_balance:
             raise Exception(
@@ -394,14 +394,22 @@ class TicTonAsyncClient:
         decoded = JettonWalletAddressDecoder().decode(result)
         return decoded.wallet_address
 
+    async def _action_check(self, dry_run: bool, wallet_addr_override: Optional[AddressLike] = None):
+        if self.wallet is None and dry_run == False:
+            raise Exception("if you want to run tick, ring, or wind, you must provide the mnemonics. Otherwise, only dry_run mode is available.")
+
+        assert (dry_run == False and self.wallet is not None) or (
+            dry_run == True and wallet_addr_override is not None and isinstance(wallet_addr_override, (str, PyAddress))
+        ), "wallet_addr_override must be provided in dry_run mode"
+
     @overload
-    async def tick(self, price: float, dry_run: Literal[False] = False, *, timeout: int = 1000, extra_ton: float = 0.1, **kwargs) -> SentMessage:
+    async def tick(self, price: float, dry_run: Literal[False] = False, *, timeout: int = 1000, extra_ton: float = 0.1, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> SentMessage:
         """
         Sending a tick message to the oracle, return message hash
         """
 
     @overload
-    async def tick(self, price: float, dry_run: Literal[True] = True, *, timeout: int = 1000, extra_ton: float = 0.1, **kwargs) -> DryRunResult:
+    async def tick(self, price: float, dry_run: Literal[True] = True, *, timeout: int = 1000, extra_ton: float = 0.1, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> DryRunResult:
         """
         Sending a tick message to the oracle in dry_run mode, return message boc
         """
@@ -413,7 +421,7 @@ class TicTonAsyncClient:
         *,
         timeout: int = 1000,
         extra_ton: float = 0.1,
-        wallet_addr_override: Optional[str] = None,
+        wallet_addr_override: Optional[AddressLike] = None,
         **kwargs,
     ):
         """
@@ -432,6 +440,7 @@ class TicTonAsyncClient:
             Whether to call toncenter simulation api or not
         wallet_addr_override : Optional[str]
             it is useful when mnemonics is not provided, you can override the wallet address with this parameter
+            only works when dry_run is set to True
 
         Examples
         --------
@@ -443,7 +452,7 @@ class TicTonAsyncClient:
         """
         assert extra_ton >= 0.1, "extra_ton must be greater than or equal to 0.1"
         assert price > 0, "price must be greater than 0"
-        assert dry_run == True and wallet_addr_override is not None, "wallet_addr_override must be provided in dry_run mode"
+        await self._action_check(dry_run, wallet_addr_override)
 
         expire_at = int(time.time()) + timeout
         price = round(price, self.metadata.quote_asset_decimals)
@@ -457,10 +466,9 @@ class TicTonAsyncClient:
 
         forward_info = begin_cell().store_uint(0, 8).store_uint(expire_at, 256).store_uint(base_asset_price, 256).end_cell()
 
-        my_wallet_address = self.wallet.address.to_string() if self.wallet is not None else wallet_addr_override
+        my_wallet_address = PyAddress(self.wallet.address.to_string() if self.wallet is not None else wallet_addr_override)  # type: ignore
         assert my_wallet_address is not None, "wallet address is not found"
-
-        await self._must_afford(my_wallet_address, Decimal(forward_ton_amount + gas_fee), Decimal(quote_asset_transfered))
+        await self._must_afford(my_wallet_address, Decimal(forward_ton_amount + gas_fee), Decimal(quote_asset_transfered))  # type: ignore
 
         # jetton transfer
         body = (
@@ -469,7 +477,7 @@ class TicTonAsyncClient:
             .store_uint(0, 64)
             .store_coins(quote_asset_transfered)
             .store_address(self.oracle)
-            .store_address(PyAddress(my_wallet_address))
+            .store_address(my_wallet_address)
             .store_bit(False)
             .store_coins(forward_ton_amount)
             .store_ref(forward_info)
@@ -478,12 +486,12 @@ class TicTonAsyncClient:
 
         jetton_wallet = await self.toncenter.get_jetton_wallets(
             GetSpecifiedJettonWalletRequest(
-                owner_address=my_wallet_address,
+                owner_address=my_wallet_address,  # type: ignore
                 jetton_address=self.metadata.quote_asset_address,
             )
         )
 
-        wallet_info = await self.toncenter.get_wallet(GetWalletRequest(address=my_wallet_address))
+        wallet_info = await self.toncenter.get_wallet(GetWalletRequest(address=my_wallet_address))  # type: ignore
 
         assert jetton_wallet is not None, f"jetton wallet does not found, you may need to get some token to initialize the jetton wallet"
         assert wallet_info.seqno is not None, "seqno is not found"
@@ -513,18 +521,18 @@ class TicTonAsyncClient:
         return result
 
     @overload
-    async def ring(self, alarm_id: int, dry_run: Literal[False] = False, **kwargs) -> SentMessage:
+    async def ring(self, alarm_id: int, dry_run: Literal[False] = False, *, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> SentMessage:
         """
         ring will close the position with the given alarm_id
         """
 
     @overload
-    async def ring(self, alarm_id: int, dry_run: Literal[True] = True, **kwargs) -> str:
+    async def ring(self, alarm_id: int, dry_run: Literal[True] = True, *, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> DryRunResult:
         """
         ring will close the position with the given alarm_id in dry_run mode
         """
 
-    async def ring(self, alarm_id: int, dry_run: bool = False, **kwargs):
+    async def ring(self, alarm_id: int, dry_run: bool = False, *, wallet_addr_override: Optional[AddressLike] = None, **kwargs):
         """
         ring will close the position with the given alarm_id
 
@@ -534,29 +542,32 @@ class TicTonAsyncClient:
             The alarm_id of the position to be closed
         dry_run : bool
             Whether to call toncenter simulation api or not
+        wallet_addr_override : Optional[str]
+            it is useful when mnemonics is not provided, you can override the wallet address with this parameter
+            only works when dry_run is set to True
 
         Examples
         --------
         >>> client = TicTonAsyncClient.init(...)
         >>> await client.ring(123)
         """
-        self.assert_wallet_exists()
+        await self._action_check(dry_run, wallet_addr_override)
+        my_wallet_address = PyAddress(self.wallet.address.to_string() if self.wallet is not None else wallet_addr_override)  # type: ignore
+
         alarm_address = await self.get_alarm_address(alarm_id)
         alarm_state = await self.get_address_state(alarm_address)
         assert alarm_state == "active", "Ring: alarm is not exist"
-        wallet = await self.toncenter.get_wallet(GetWalletRequest(address=my_wallet_address))
+        wallet = await self.toncenter.get_wallet(GetWalletRequest(address=my_wallet_address))  # type: ignore
         assert wallet.seqno is not None, "Ring: seqno is not found in wallet info"
         gas_fee = int(0.35 * 10**9)
         body = begin_cell().store_uint(0xC3510A29, 32).store_uint(1, 257).store_uint(alarm_id, 257).end_cell()  # query_id cannot be 0
 
         if dry_run:
-            return await self._dry_run(
-                to_address=self.oracle.to_string(),
+            return DryRunResult(
+                boc=bytes_to_b64str(body.to_boc(False)),
+                desitnation=self.oracle,  # type: ignore
                 amount=gas_fee,
-                seqno=wallet.seqno,
-                body=body,
             )
-
         result = await self._send(
             to_address=self.oracle.to_string(),
             amount=gas_fee,
@@ -580,6 +591,8 @@ class TicTonAsyncClient:
         need_quote_asset: Optional[Decimal] = None,
         need_base_asset: Optional[Decimal] = None,
         dry_run: Literal[False] = False,
+        *,
+        wallet_addr_override: Optional[AddressLike] = None,
         **kwargs,
     ) -> SentMessage:
         """
@@ -596,8 +609,10 @@ class TicTonAsyncClient:
         need_quote_asset: Optional[Decimal] = None,
         need_base_asset: Optional[Decimal] = None,
         dry_run: Literal[True] = True,
+        *,
+        wallet_addr_override: Optional[AddressLike] = None,
         **kwargs,
-    ) -> str:
+    ) -> DryRunResult:
         """
         wind will arbitrage the position with the given alarm_id, buy_num and new_price in dry_run mode, return message boc
         """
@@ -611,6 +626,8 @@ class TicTonAsyncClient:
         need_quote_asset: Optional[Decimal] = None,
         need_base_asset: Optional[Decimal] = None,
         dry_run: bool = False,
+        *,
+        wallet_addr_override: Optional[AddressLike] = None,
         **kwargs,
     ):
         """
@@ -635,10 +652,12 @@ class TicTonAsyncClient:
         >>> client = TicTonAsyncClient.init(...)
         >>> await client.wind(123, 1, 5)
         """
-        self.assert_wallet_exists()
+        await self._action_check(dry_run, wallet_addr_override)
         assert new_price > 0, "new_price must be greater than 0"
         assert isinstance(buy_num, int), "buy_num must be an int"
         assert buy_num > 0, "buy_num must be greater than 0"
+
+        my_wallet_address = PyAddress(self.wallet.address.to_string() if self.wallet is not None else wallet_addr_override)  # type: ignore
 
         new_price_ff = await self._convert_price(new_price)
 
@@ -652,12 +671,9 @@ class TicTonAsyncClient:
 
             need_base_asset, need_quote_asset = need_asset_tup
 
-        wallet = await self.toncenter.get_wallet(GetWalletRequest(address=my_wallet_address))
-        assert wallet.seqno is not None, "seqno is not found in wallet info"
-
         gas_fee = int(0.5 * 10**9)
 
-        can_afford = await self._must_afford(Decimal(need_base_asset + gas_fee), need_quote_asset)
+        can_afford = await self._must_afford(my_wallet_address, Decimal(need_base_asset + gas_fee), need_quote_asset)  # type: ignore
         assert can_afford, "not enough balance"
 
         forward_info = begin_cell().store_uint(1, 8).store_uint(alarm_id, 256).store_uint(buy_num, 32).store_uint(int(new_price_ff.raw_value), 256).end_cell()
@@ -668,7 +684,7 @@ class TicTonAsyncClient:
             .store_uint(0, 64)
             .store_coins(int(need_quote_asset))
             .store_address(self.oracle)
-            .store_address(self.wallet.address)
+            .store_address(self.wallet.address)  # type: ignore
             .store_bit(False)
             .store_coins(int(need_base_asset) + gas_fee)
             .store_ref(forward_info)
@@ -677,7 +693,7 @@ class TicTonAsyncClient:
 
         jetton_wallet = await self.toncenter.get_jetton_wallets(
             GetSpecifiedJettonWalletRequest(
-                owner_address=my_wallet_address,
+                owner_address=my_wallet_address,  # type: ignore
                 jetton_address=self.metadata.quote_asset_address,
             )
         )
@@ -685,17 +701,19 @@ class TicTonAsyncClient:
         assert jetton_wallet is not None, "jetton wallet does not found"
 
         if dry_run:
-            return await self._dry_run(
-                to_address=jetton_wallet.address.to_string(),  # type: ignore
+            return DryRunResult(
+                boc=bytes_to_b64str(body.to_boc(False)),
+                desitnation=jetton_wallet.address,
                 amount=int(need_base_asset) + gas_fee,
-                seqno=wallet.seqno,
-                body=body,
             )
+
+        wallet_info = await self.toncenter.get_wallet(GetWalletRequest(address=my_wallet_address))  # type: ignore
+        assert wallet_info.seqno is not None, "seqno is not found in wallet info"
 
         result = await self._send(
             to_address=jetton_wallet.address.to_string(),  # type: ignore
             amount=int(need_base_asset) + gas_fee,
-            seqno=wallet.seqno,
+            seqno=wallet_info.seqno,
             body=body,
         )
 
@@ -798,7 +816,7 @@ class TicTonAsyncClient:
 
             params.offset += len(txs)
 
-            for tx in txs:
+            for tx in txs[0]:
                 try:
                     msg = tx.in_msg
                     if msg.message_content is None:
