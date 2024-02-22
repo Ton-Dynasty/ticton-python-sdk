@@ -107,7 +107,7 @@ class TicTonAsyncClient:
     @classmethod
     async def init(
         cls: Type[TicTonAsyncClient],
-        mnemonics: Optional[str] = None,
+        mnemonics: Union[Literal["auto", "unset"], str] = "auto",
         oracle_addr: Optional[str] = None,
         toncenter_api_key: Optional[str] = None,
         wallet_version: Literal["v2r1", "v2r2", "v3r1", "v3r2", "v4r1", "v4r2", "hv2"] = "v4r2",
@@ -116,7 +116,30 @@ class TicTonAsyncClient:
         testnet: bool = True,
         logger: Optional[logging.Logger] = None,
     ) -> TicTonAsyncClient:
-        mnemonics = getenv("TICTON_WALLET_MNEMONICS", mnemonics)
+        """
+        Parameters
+        ----------
+        mnemonics : Union[Literal["auto", "unset"], str]
+            The mnemonics of the user's wallet, if "auto", the mnemonics will be read from the environment variable TICTON_WALLET_MNEMONICS, if "unset", the mnemonics will be set to None. Otherwise, the mnemonics will be set to the given value.
+        oracle_addr : Optional[str]
+            The address of the oracle contract
+        toncenter_api_key : Optional[str]
+            The api key of the toncenter
+        wallet_version : Literal["v2r1", "v2r2", "v3r1", "v3r2", "v4r1", "v4r2", "hv2"]
+            The version of the wallet
+        threshold_price : float
+            The threshold price of the position
+        testnet : bool
+            Whether to use testnet or mainnet
+        """
+        assert mnemonics in {"auto", "unset"} or isinstance(mnemonics, str), "mnemonics must be a string or 'auto' or 'unset'"
+        if mnemonics == "auto":
+            phrase = getenv("TICTON_WALLET_MNEMONICS", None)
+        elif mnemonics == "unset":
+            phrase = None
+        else:
+            phrase = mnemonics
+
         wallet_version = getenv("TICTON_WALLET_VERSION", wallet_version)  # type: ignore
         oracle_addr_str = getenv("TICTON_ORACLE_ADDRESS", oracle_addr)
         toncenter_api_key = getenv("TICTON_TONCENTER_API_KEY", toncenter_api_key)
@@ -134,7 +157,7 @@ class TicTonAsyncClient:
         return cls(
             metadata=metadata,
             toncenter=toncenter,
-            mnemonics=mnemonics,
+            mnemonics=phrase,
             oracle_addr=oracle_addr_str,
             wallet_version=wallet_version,
             threshold_price=threshold_price,
@@ -169,7 +192,7 @@ class TicTonAsyncClient:
         return price.to_float() * 10**self.metadata.base_asset_decimals / 10**self.metadata.quote_asset_decimals
 
     def assert_wallet_exists(self):
-        assert hasattr(self, "wallet"), "wallet is not found"
+        assert hasattr(self, "wallet"), "if you want to run this method, you must provide the mnemonics"
 
     async def _get_user_balance(self) -> Tuple[Decimal, Decimal]:
         """
