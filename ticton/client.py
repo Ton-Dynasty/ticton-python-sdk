@@ -683,7 +683,7 @@ class TicTonAsyncClient:
             .store_uint(0, 64)
             .store_coins(int(need_quote_asset))
             .store_address(self.oracle)
-            .store_address(self.wallet.address)  # type: ignore
+            .store_address(my_wallet_address)
             .store_bit(False)
             .store_coins(int(need_base_asset) + gas_fee)
             .store_ref(forward_info)
