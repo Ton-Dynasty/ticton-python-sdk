@@ -673,8 +673,7 @@ class TicTonAsyncClient:
 
         gas_fee = int(0.5 * 10**9)
 
-        can_afford = await self._must_afford(my_wallet_address, Decimal(need_base_asset + gas_fee), need_quote_asset)  # type: ignore
-        assert can_afford, "not enough balance"
+        await self._must_afford(my_wallet_address, Decimal(need_base_asset + gas_fee), need_quote_asset)  # type: ignore
 
         forward_info = begin_cell().store_uint(1, 8).store_uint(alarm_id, 256).store_uint(buy_num, 32).store_uint(int(new_price_ff.raw_value), 256).end_cell()
 
