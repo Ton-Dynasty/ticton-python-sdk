@@ -1,7 +1,7 @@
 from .arithmetic import FixedFloat, to_token, token_to_float
 from .client import DryRunResult, TicTonAsyncClient
 
-__version__ = "0.1.16"
+__version__ = "0.1.17"
 
 __all__ = [
     "FixedFloat",
