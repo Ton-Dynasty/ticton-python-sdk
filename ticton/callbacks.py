@@ -130,7 +130,7 @@ async def handle_chime(
         OnWindSuccessParams(
             timekeeper=tock_msg.watchmaker,  # type: ignore
             alarm_id=wind_msg.alarm_index,
-            new_base_asset_price=float(FixedFloat(wind_msg.base_asset_price, skip_scale=True).to_float()) * 1e3,
+            new_base_asset_price=float(FixedFloat(wind_msg.new_base_asset_price, skip_scale=True).to_float()) * 1e3,
             remain_scale=wind_msg.remain_scale,
             new_alarm_id=new_alarm_index,
             created_at=tock_msg.created_at,
