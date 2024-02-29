@@ -1,14 +1,14 @@
-from pytoncenter import AsyncTonCenterClientV3
-from pytoncenter.v3.models import *
+from typing import Callable, Coroutine, Optional
+
 from pydantic import BaseModel, Field
-from tonpy import CellSlice
-from typing import Coroutine, Optional
-from pytoncenter.utils import get_opcode
+from pytoncenter import AsyncTonCenterClientV3
 from pytoncenter.extension.message import JettonMessage
-from .parser import TicTonMessage
+from pytoncenter.utils import get_opcode
+from pytoncenter.v3.models import *
+from tonpy import CellSlice
+
 from .arithmetic import FixedFloat
-from typing import Callable
-import traceback
+from .parser import TicTonMessage
 
 
 class OnTickSuccessParams(BaseModel):
@@ -78,7 +78,7 @@ async def _handle_tick(
         out_msg_cs = CellSlice(candidate.message_content.body)
         out_opcode = get_opcode(out_msg_cs.preload_uint(32))
         if out_opcode == TicTonMessage.Tock.OPCODE:
-            txs = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
+            txs, _ = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
             assert len(txs) == 1
             tock_tx = txs[0]
             assert tock_tx.in_msg.message_content is not None
@@ -111,7 +111,7 @@ async def handle_chime(
         out_msg_cs = CellSlice(candidate.message_content.body)
         out_opcode = get_opcode(out_msg_cs.preload_uint(32))
         if out_opcode == TicTonMessage.Tock.OPCODE:
-            txs = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
+            txs, _ = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
             if len(txs) == 0:
                 return
             assert len(txs) == 1
@@ -156,7 +156,7 @@ async def handle_chronoshift(
         out_msg_cs = CellSlice(candidate.message_content.body)
         out_opcode = get_opcode(out_msg_cs.preload_uint(32))
         if out_opcode == TicTonMessage.JettonMintPartial.OPCODE:
-            txs = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
+            txs, _ = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
             assert len(txs) == 1
             jetton_mint_tx = txs[0]
             if jetton_mint_tx.in_msg.message_content is None:
