@@ -744,7 +744,7 @@ class TicTonAsyncClient:
         if isinstance(start_lt, int):
             begin_lt = start_lt
         if start_lt == "latest":
-            latest_txs = await self.toncenter.get_transactions(
+            latest_txs, _ = await self.toncenter.get_transactions(
                 GetTransactionsRequest(
                     account=self.oracle.to_string(),
                     limit=1,
@@ -803,7 +803,7 @@ class TicTonAsyncClient:
 
         while True:
             start_utime = time.monotonic()
-            txs = await self.toncenter.get_transactions(
+            txs, _ = await self.toncenter.get_transactions(
                 GetTransactionsRequest(
                     account=self.oracle.to_string(True),
                     start_lt=params.start_lt,
@@ -815,7 +815,7 @@ class TicTonAsyncClient:
 
             params.offset += len(txs)
 
-            for tx in txs[0]:
+            for tx in txs:
                 try:
                     msg = tx.in_msg
                     if msg.message_content is None:
