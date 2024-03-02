@@ -720,7 +720,7 @@ class TicTonAsyncClient:
 
         await self._must_afford(my_wallet_address, Decimal(need_base_asset + gas_fee), need_quote_asset)  # type: ignore
 
-        forward_info = begin_cell().store_uint(1, 8).store_uint(alarm_id, 256).store_uint(buy_num, 32).store_uint(forward_ton_amount, 256).end_cell()
+        forward_info = begin_cell().store_uint(1, 8).store_uint(alarm_id, 256).store_uint(buy_num, 32).store_uint(int(new_price_ff.raw_value), 256).end_cell()
 
         body = (
             begin_cell()
