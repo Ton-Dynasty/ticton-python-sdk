@@ -347,7 +347,12 @@ class TicTonAsyncClient:
             alarm_metadata,
         )
 
-    async def _must_afford(self, wallet_address: AddressLike, need_base_asset: Decimal, need_quote_asset: Decimal):
+    async def _must_afford(
+        self,
+        wallet_address: AddressLike,
+        need_base_asset: Decimal,
+        need_quote_asset: Decimal,
+    ):
         base_asset_balance, quote_asset_balance = await self._get_user_balance(wallet_address)
         if need_base_asset > base_asset_balance or need_quote_asset > quote_asset_balance:
             raise Exception(
@@ -403,13 +408,31 @@ class TicTonAsyncClient:
         ), "wallet_addr_override must be provided in dry_run mode"
 
     @overload
-    async def tick(self, price: float, dry_run: Literal[False] = False, *, timeout: int = 1000, extra_ton: float = 0.1, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> SentMessage:
+    async def tick(
+        self,
+        price: float,
+        dry_run: Literal[False] = False,
+        *,
+        timeout: int = 1000,
+        extra_ton: float = 0.1,
+        wallet_addr_override: Optional[AddressLike] = None,
+        **kwargs,
+    ) -> SentMessage:
         """
         Sending a tick message to the oracle, return message hash
         """
 
     @overload
-    async def tick(self, price: float, dry_run: Literal[True] = True, *, timeout: int = 1000, extra_ton: float = 0.1, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> DryRunResult:
+    async def tick(
+        self,
+        price: float,
+        dry_run: Literal[True] = True,
+        *,
+        timeout: int = 1000,
+        extra_ton: float = 0.1,
+        wallet_addr_override: Optional[AddressLike] = None,
+        **kwargs,
+    ) -> DryRunResult:
         """
         Sending a tick message to the oracle in dry_run mode, return message boc
         """
@@ -521,18 +544,39 @@ class TicTonAsyncClient:
         return result
 
     @overload
-    async def ring(self, alarm_id: int, dry_run: Literal[False] = False, *, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> SentMessage:
+    async def ring(
+        self,
+        alarm_id: int,
+        dry_run: Literal[False] = False,
+        *,
+        wallet_addr_override: Optional[AddressLike] = None,
+        **kwargs,
+    ) -> SentMessage:
         """
         ring will close the position with the given alarm_id
         """
 
     @overload
-    async def ring(self, alarm_id: int, dry_run: Literal[True] = True, *, wallet_addr_override: Optional[AddressLike] = None, **kwargs) -> DryRunResult:
+    async def ring(
+        self,
+        alarm_id: int,
+        dry_run: Literal[True] = True,
+        *,
+        wallet_addr_override: Optional[AddressLike] = None,
+        **kwargs,
+    ) -> DryRunResult:
         """
         ring will close the position with the given alarm_id in dry_run mode
         """
 
-    async def ring(self, alarm_id: int, dry_run: bool = False, *, wallet_addr_override: Optional[AddressLike] = None, **kwargs):
+    async def ring(
+        self,
+        alarm_id: int,
+        dry_run: bool = False,
+        *,
+        wallet_addr_override: Optional[AddressLike] = None,
+        **kwargs,
+    ):
         """
         ring will close the position with the given alarm_id
 
@@ -672,10 +716,11 @@ class TicTonAsyncClient:
             need_base_asset, need_quote_asset = need_asset_tup
 
         gas_fee = int(0.5 * 10**9)
+        forward_ton_amount = int(need_base_asset) + gas_fee
 
         await self._must_afford(my_wallet_address, Decimal(need_base_asset + gas_fee), need_quote_asset)  # type: ignore
 
-        forward_info = begin_cell().store_uint(1, 8).store_uint(alarm_id, 256).store_uint(buy_num, 32).store_uint(int(new_price_ff.raw_value), 256).end_cell()
+        forward_info = begin_cell().store_uint(1, 8).store_uint(alarm_id, 256).store_uint(buy_num, 32).store_uint(forward_ton_amount, 256).end_cell()
 
         body = (
             begin_cell()
@@ -685,7 +730,7 @@ class TicTonAsyncClient:
             .store_address(self.oracle)
             .store_address(my_wallet_address)
             .store_bit(False)
-            .store_coins(int(need_base_asset) + gas_fee)
+            .store_coins(forward_ton_amount)
             .store_ref(forward_info)
             .end_cell()
         )
@@ -703,7 +748,7 @@ class TicTonAsyncClient:
             return DryRunResult(
                 boc=bytes_to_b64str(body.to_boc(False)),
                 desitnation=jetton_wallet.address,
-                amount=int(need_base_asset) + gas_fee,
+                amount=forward_ton_amount + gas_fee,
             )
 
         wallet_info = await self.toncenter.get_wallet(GetWalletRequest(address=my_wallet_address))  # type: ignore
@@ -711,7 +756,7 @@ class TicTonAsyncClient:
 
         result = await self._send(
             to_address=jetton_wallet.address.to_string(),  # type: ignore
-            amount=int(need_base_asset) + gas_fee,
+            amount=forward_ton_amount + gas_fee,
             seqno=wallet_info.seqno,
             body=body,
         )
