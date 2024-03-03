@@ -240,10 +240,10 @@ class TicTonAsyncClient:
             ),
         )
 
-        if isinstance(base_asset_balance, AssertionError):
+        if isinstance(base_asset_balance, AssertionError) or isinstance(base_asset_balance, Exception):
             warnings.warn(f"your base asset balance is not found. reason: {base_asset_balance}")
             base_asset_balance = Decimal(0)
-        if isinstance(quote_asset_balance, AssertionError):
+        if isinstance(quote_asset_balance, AssertionError) or isinstance(quote_asset_balance, Exception):
             warnings.warn(f"your quote asset balance is not found. reason: {quote_asset_balance}")
             quote_asset_balance = Decimal(0)
 
