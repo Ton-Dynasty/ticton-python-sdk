@@ -123,6 +123,7 @@ class TicTonAsyncClient:
         *,
         testnet: bool = True,
         logger: Optional[logging.Logger] = None,
+        qps: Optional[float] = None,
     ) -> TicTonAsyncClient:
         """
         Parameters
@@ -158,6 +159,7 @@ class TicTonAsyncClient:
             version="v3",
             network="testnet" if testnet else "mainnet",
             api_key=toncenter_api_key,
+            qps=qps,
         )
 
         metadata = await cls.get_oracle_metadata(toncenter, oracle_addr_str)
