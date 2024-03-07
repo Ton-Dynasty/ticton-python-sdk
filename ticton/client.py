@@ -884,9 +884,7 @@ class TicTonAsyncClient:
                         **kwargs,
                     )
                 except Exception as e:
-                    import traceback
-
-                    self.logger.info(traceback.format_exc())
+                    self.logger.debug(e)
 
             end_utime = time.monotonic()
             runtime = end_utime - start_utime
