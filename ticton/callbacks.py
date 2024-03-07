@@ -12,13 +12,18 @@ from .parser import TicTonMessage
 
 
 class OnTickSuccessParams(BaseModel):
+    tx: Transaction
     watchmaker: AddressLike
     base_asset_price: float
     new_alarm_id: int
     created_at: int
 
+    def __str__(self):
+        return f"Tick success: new_alarm_id={self.new_alarm_id}, watchmaker={self.watchmaker}, base_asset_price={self.base_asset_price}, created_at={self.created_at}"
+
 
 class OnWindSuccessParams(BaseModel):
+    tx: Transaction
     timekeeper: AddressLike
     alarm_id: int
     new_base_asset_price: float
@@ -26,13 +31,20 @@ class OnWindSuccessParams(BaseModel):
     new_alarm_id: int
     created_at: int
 
+    def __str__(self):
+        return f"Wind success: new_alarm_id={self.new_alarm_id}, alarm_id={self.alarm_id}, timekeeper={self.timekeeper}, new_base_asset_price={self.new_base_asset_price}, remain_scale={self.remain_scale}, created_at={self.created_at}"
+
 
 class OnRingSuccessParams(BaseModel):
+    tx: Transaction
     alarm_id: int = Field(..., description="alarm index")
     created_at: int = Field(..., description="created at")
     origin: Optional[AddressLike] = Field(None, description="origin address, maybe empty if no reward")
     receiver: Optional[AddressLike] = Field(None, description="receiver address, maybe empty if no reward")
     reward: float = Field(0.0, description="reward amount")
+
+    def __str__(self):
+        return f"Ring success: alarm_id={self.alarm_id}, origin={self.origin}, receiver={self.receiver}, reward={self.reward}, created_at={self.created_at}"
 
 
 async def handle_noop(*args, **kwargs): ...
@@ -88,6 +100,7 @@ async def _handle_tick(
             await on_tick_success(
                 client,
                 OnTickSuccessParams(
+                    tx=tx,
                     watchmaker=tock_msg.watchmaker,  # type: ignore
                     base_asset_price=base_asset_price,
                     new_alarm_id=tock_msg.alarm_index,
@@ -131,6 +144,7 @@ async def handle_chime(
     await on_wind_success(
         client,
         OnWindSuccessParams(
+            tx=tx,
             timekeeper=tock_msg.watchmaker,  # type: ignore
             alarm_id=wind_msg.alarm_index,
             new_base_asset_price=float(FixedFloat(wind_msg.new_base_asset_price, skip_scale=True).to_float()) * 1e3,
@@ -174,6 +188,7 @@ async def handle_chronoshift(
     await on_ring_success(
         client,
         OnRingSuccessParams(
+            tx=tx,
             alarm_id=chronoshift_msg.alarm_index,
             created_at=chronoshift_msg.created_at,
             origin=origin,  # type: ignore

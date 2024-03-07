@@ -43,46 +43,7 @@ client = await TicTonAsyncClient.init(
 ```
 
 ## Usage Example
-### Getting Alarm Information
-```python
-alarm_address = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-result = await client.get_alarm_info(alarm_address)
-```
-`result` is a json object containing the following information:
-- watchmaker_address
-- base_asset_scale
-- quote_asset_scale
-- remain_scale
-- base_asset_price
-- base_asset_amount
-- quote_asset_amount
-- created_at
-
-### Getting the Amount of Alarms
-```python
-amount = await client.get_alarms_amount()
-```
-
-### Checking the State of Alarms
-```python
-alarm_id_list = [1,2]
-
-alarm_dict = await client.check_alarms(alarm_id_list)
-```
-Example output:
-```python
-alarm_dict = {
-    1: {
-        "state": "active",
-        "address": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    },
-    2: {
-        "state": "unintialized",
-        "address": "BCDEFGHIJKLMNOPQRSTUVWXYZA"
-    },
-}
-```
+[Use Case - Ticton Oracle Automation](https://github.com/Ton-Dynasty/ticton-oracle-automation/tree/main)
 
 ### Tick
 tick will open a alarm with the given price and timeout, the total amount
