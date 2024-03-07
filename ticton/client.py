@@ -762,26 +762,27 @@ class TicTonAsyncClient:
 
     async def subscribe(
         self,
-        on_tick_success: Callable[[OnTickSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
-        on_wind_success: Callable[[OnWindSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
-        on_ring_success: Callable[[OnRingSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_tick_success: Callable[[AsyncTonCenterClientV3, OnTickSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_wind_success: Callable[[AsyncTonCenterClientV3, OnWindSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_ring_success: Callable[[AsyncTonCenterClientV3, OnRingSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
         start_lt: Union[int, Literal["latest", "oldest"]] = "oldest",
         interval: Union[int, float] = 2.0,
         *,
         limit: int = 128,
+        **kwargs,
     ):
         """
         subscribe will subscribe to the oracle's notifications and chimes, and call the corresponding callback functions when a notification or chime is received.
 
         Parameters
         ----------
-        on_tick_success : Callable[[OnTickSuccessParams], Coroutine[Any, Any, None]]
+        on_tick_success : Callable[[OnTickSuccessParams, **kwargs], Coroutine[Any, Any, None]]
             The callback function to be called when a JettonTransferNotification(Tick) is received
 
-        on_wind_success : Callable[[OnWindSuccessParams], Coroutine[Any, Any, None]]
+        on_wind_success : Callable[[OnWindSuccessParams, **kwargs], Coroutine[Any, Any, None]]
             The callback function to be called when a chronoShift is received
 
-        on_ring_success : Callable[[OnRingSuccessParams], Coroutine[Any, Any, None]]
+        on_ring_success : Callable[[OnRingSuccessParams, **kwargs], Coroutine[Any, Any, None]]
             The callback function to be called when a chime is received
 
         start_lt : Optional[int]
@@ -833,6 +834,7 @@ class TicTonAsyncClient:
                         on_tick_success=on_tick_success,
                         on_wind_success=on_wind_success,
                         on_ring_success=on_ring_success,
+                        **kwargs,
                     )
                 except:
                     pass
