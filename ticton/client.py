@@ -809,9 +809,9 @@ class TicTonAsyncClient:
 
     async def subscribe(
         self,
-        on_tick_success: Callable[[AsyncTonCenterClientV3, OnTickSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
-        on_wind_success: Callable[[AsyncTonCenterClientV3, OnWindSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
-        on_ring_success: Callable[[AsyncTonCenterClientV3, OnRingSuccessParams], Coroutine[Any, Any, None]] = handle_noop,
+        on_tick_success: Callable[[TicTonAsyncClient, OnTickSuccessParams, Any], Coroutine[Any, Any, None]] = handle_noop,
+        on_wind_success: Callable[[TicTonAsyncClient, OnWindSuccessParams, Any], Coroutine[Any, Any, None]] = handle_noop,
+        on_ring_success: Callable[[TicTonAsyncClient, OnRingSuccessParams, Any], Coroutine[Any, Any, None]] = handle_noop,
         start_lt: Union[int, Literal["latest", "oldest"]] = "oldest",
         interval: Union[int, float] = 2.0,
         *,
@@ -875,7 +875,7 @@ class TicTonAsyncClient:
 
                     handle_func = callbacks.get(opcode, handle_noop)
                     await handle_func(
-                        client=self.toncenter,
+                        ticton_client=self,
                         body=cs,
                         tx=tx,
                         on_tick_success=on_tick_success,
@@ -883,8 +883,10 @@ class TicTonAsyncClient:
                         on_ring_success=on_ring_success,
                         **kwargs,
                     )
-                except:
-                    pass
+                except Exception as e:
+                    import traceback
+
+                    self.logger.info(traceback.format_exc())
 
             end_utime = time.monotonic()
             runtime = end_utime - start_utime

@@ -1,7 +1,6 @@
-from typing import Callable, Coroutine, Optional
+from typing import Any, Callable, Coroutine, Optional
 
 from pydantic import BaseModel, Field
-from pytoncenter import AsyncTonCenterClientV3
 from pytoncenter.extension.message import JettonMessage
 from pytoncenter.utils import get_opcode
 from pytoncenter.v3.models import *
@@ -51,10 +50,10 @@ async def handle_noop(*args, **kwargs): ...
 
 
 async def handle_notification(
-    client: AsyncTonCenterClientV3,
+    ticton_client: Any,
     body: CellSlice,
     tx: Transaction,
-    on_tick_success: Callable[[OnTickSuccessParams], Coroutine[Any, Any, None]],
+    on_tick_success: Callable[[Any, OnTickSuccessParams, Any], Coroutine[Any, Any, None]],
     **kwargs,
 ):
     msg = JettonMessage.TransferNotification.parse(body)
@@ -62,21 +61,20 @@ async def handle_notification(
         return
     opcode = get_opcode(msg.forward_payload.preload_uint(8))
     if opcode == TicTonMessage.Tick.OPCODE:
-        await _handle_tick(
-            client=client,
+        return await _handle_tick(
+            ticton_client=ticton_client,
             body=msg.forward_payload,
             tx=tx,
             on_tick_success=on_tick_success,
             **kwargs,
         )
-        return
 
 
 async def _handle_tick(
-    client: AsyncTonCenterClientV3,
+    ticton_client: Any,
     body: CellSlice,
     tx: Transaction,
-    on_tick_success: Callable[[AsyncTonCenterClientV3, OnTickSuccessParams], Coroutine[Any, Any, None]],
+    on_tick_success: Callable[[Any, OnTickSuccessParams, Any], Coroutine[Any, Any, None]],
     **kwargs,
 ):
     try:
@@ -90,32 +88,33 @@ async def _handle_tick(
         out_msg_cs = CellSlice(candidate.message_content.body)
         out_opcode = get_opcode(out_msg_cs.preload_uint(32))
         if out_opcode == TicTonMessage.Tock.OPCODE:
-            txs, _ = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
+            txs, _ = await ticton_client.toncenter.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
             assert len(txs) == 1
             tock_tx = txs[0]
             assert tock_tx.in_msg.message_content is not None
             tock_cs = CellSlice(tock_tx.in_msg.message_content.body)
             tock_msg = TicTonMessage.Tock.parse(tock_cs)
-            base_asset_price = float(FixedFloat(tick_msg.base_asset_price, skip_scale=True).to_float()) * 1e3
-            await on_tick_success(
-                client,
+            base_asset_price = float(FixedFloat(tick_msg.base_asset_price, skip_scale=True).to_float()) * 10 ** (
+                ticton_client.metadata.base_asset_decimals - ticton_client.metadata.quote_asset_decimals
+            )
+            return await on_tick_success(
+                ticton_client,
                 OnTickSuccessParams(
                     tx=tx,
                     watchmaker=tock_msg.watchmaker,  # type: ignore
                     base_asset_price=base_asset_price,
                     new_alarm_id=tock_msg.alarm_index,
                     created_at=tock_msg.created_at,
-                )
-                ** kwargs,
+                ),
+                **kwargs,
             )
-            return
 
 
 async def handle_chime(
-    client: AsyncTonCenterClientV3,
+    ticton_client: Any,
     body: CellSlice,
     tx: Transaction,
-    on_wind_success: Callable[[AsyncTonCenterClientV3, OnWindSuccessParams], None],
+    on_wind_success: Callable[[Any, OnWindSuccessParams], None],
     **kwargs,
 ):
     wind_msg = TicTonMessage.Chime.parse(body)
@@ -126,7 +125,7 @@ async def handle_chime(
         out_msg_cs = CellSlice(candidate.message_content.body)
         out_opcode = get_opcode(out_msg_cs.preload_uint(32))
         if out_opcode == TicTonMessage.Tock.OPCODE:
-            txs, _ = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
+            txs, _ = await ticton_client.toncenter.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
             if len(txs) == 0:
                 return
             assert len(txs) == 1
@@ -141,13 +140,14 @@ async def handle_chime(
     if new_alarm_index is None:
         return
 
-    await on_wind_success(
-        client,
+    return await on_wind_success(
+        ticton_client,
         OnWindSuccessParams(
             tx=tx,
             timekeeper=tock_msg.watchmaker,  # type: ignore
             alarm_id=wind_msg.alarm_index,
-            new_base_asset_price=float(FixedFloat(wind_msg.new_base_asset_price, skip_scale=True).to_float()) * 1e3,
+            new_base_asset_price=float(FixedFloat(wind_msg.new_base_asset_price, skip_scale=True).to_float())
+            * 10 ** (ticton_client.metadata.base_asset_decimals - ticton_client.metadata.quote_asset_decimals),
             remain_scale=wind_msg.remain_scale,
             new_alarm_id=new_alarm_index,
             created_at=tock_msg.created_at,
@@ -157,10 +157,10 @@ async def handle_chime(
 
 
 async def handle_chronoshift(
-    client: AsyncTonCenterClientV3,
+    ticton_client: Any,
     body: CellSlice,
     tx: Transaction,
-    on_ring_success: Callable[[AsyncTonCenterClientV3, OnRingSuccessParams], None],
+    on_ring_success: Callable[[Any, OnRingSuccessParams, Any], None],
     **kwargs,
 ):
     chronoshift_msg = TicTonMessage.Chronoshift.parse(body)
@@ -174,7 +174,7 @@ async def handle_chronoshift(
         out_msg_cs = CellSlice(candidate.message_content.body)
         out_opcode = get_opcode(out_msg_cs.preload_uint(32))
         if out_opcode == TicTonMessage.JettonMintPartial.OPCODE:
-            txs, _ = await client.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
+            txs, _ = await ticton_client.toncenter.get_transaction_by_message(GetTransactionByMessageRequest(direction="in", msg_hash=candidate.hash))
             assert len(txs) == 1
             jetton_mint_tx = txs[0]
             if jetton_mint_tx.in_msg.message_content is None:
@@ -185,8 +185,8 @@ async def handle_chronoshift(
             receiver = jetton_mint_msg.receiver
             reward = float(jetton_mint_msg.amount) / 1e9
 
-    await on_ring_success(
-        client,
+    return await on_ring_success(
+        ticton_client,
         OnRingSuccessParams(
             tx=tx,
             alarm_id=chronoshift_msg.alarm_index,
