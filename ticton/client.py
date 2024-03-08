@@ -42,7 +42,6 @@ from .decoder import (
     AlarmMetadataDecoder,
     EstimateDataDecoder,
     JettonWalletAddressDecoder,
-    OracleMetadata,
     OracleMetadataDecoder,
     OracleMetadataWithSymbols,
 )
@@ -76,12 +75,12 @@ async def get_symbol_from_address(toncenter: AsyncTonCenterClientV3, base_asset_
     base_symbol = "UNKNOWN"
     quote_symbol = "UNKNOWN"
     if result[0] is not None:
-        if result[0].jetton_content.symbol is not None:
+        if result[0].jetton_content is not None and result[0].jetton_content.symbol is not None:
             base_symbol = result[0].jetton_content.symbol
     else:
         base_symbol = "TON"
     if result[1] is not None:
-        if result[1].jetton_content.symbol is not None:
+        if result[1].jetton_content is not None and result[1].jetton_content.symbol is not None:
             quote_symbol = result[1].jetton_content.symbol
     else:
         quote_symbol = "TON"
@@ -171,12 +170,8 @@ class TicTonAsyncClient:
 
         metadata = await cls.get_oracle_metadata(toncenter, oracle_addr_str)
 
-        base_symbol, quote_symbol = await get_symbol_from_address(toncenter, metadata.base_asset_address, metadata.quote_asset_address)
-
-        new_metadata = OracleMetadataWithSymbols(**metadata.model_dump(), base_asset_symbol=base_symbol, quote_asset_symbol=quote_symbol)
-
         return cls(
-            metadata=new_metadata,
+            metadata=metadata,
             toncenter=toncenter,
             mnemonics=phrase,
             oracle_addr=oracle_addr_str,
@@ -190,9 +185,11 @@ class TicTonAsyncClient:
         cls: Type[TicTonAsyncClient],
         toncenter: AsyncTonCenterClientV3,
         oracle_addr: str,
-    ) -> OracleMetadata:
+    ) -> OracleMetadataWithSymbols:
         result = await toncenter.run_get_method(RunGetMethodRequest(address=oracle_addr, method="getOracleData", stack=[]))
-        return OracleMetadataDecoder().decode(result)
+        md = OracleMetadataDecoder().decode(result)
+        base_symbol, quote_symbol = await get_symbol_from_address(toncenter, md.base_asset_address, md.quote_asset_address)
+        return OracleMetadataWithSymbols(**md.model_dump(), base_asset_symbol=base_symbol, quote_asset_symbol=quote_symbol)
 
     async def sync_oracle_metadata(self):
         self.metadata = await self.get_oracle_metadata(self.toncenter, self.oracle.to_string())
