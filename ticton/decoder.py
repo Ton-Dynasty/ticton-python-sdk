@@ -20,6 +20,11 @@ class OracleMetadata(BaseModel):
     total_alarms: int
 
 
+class OracleMetadataWithSymbols(OracleMetadata):
+    base_asset_symbol: str
+    quote_asset_symbol: str
+
+
 class AlarmMetadata(BaseModel):
     watchmaker_address: AddressLike
     base_asset_scale: int

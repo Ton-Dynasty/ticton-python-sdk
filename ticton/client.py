@@ -44,6 +44,7 @@ from .decoder import (
     JettonWalletAddressDecoder,
     OracleMetadata,
     OracleMetadataDecoder,
+    OracleMetadataWithSymbols,
 )
 from .parser import TicTonMessage
 
@@ -67,10 +68,30 @@ class DryRunResult(BaseModel):
     amount: int = Field(..., description="Transfer amount in nanoTON")
 
 
+async def get_symbol_from_address(toncenter: AsyncTonCenterClientV3, base_asset_address: AddressLike, quote_asset_address: AddressLike) -> Tuple[str, str]:
+    result = await toncenter.multicall(
+        toncenter.get_jetton_masters(base_asset_address),
+        toncenter.get_jetton_masters(quote_asset_address),
+    )
+    base_symbol = "UNKNOWN"
+    quote_symbol = "UNKNOWN"
+    if result[0] is not None:
+        if result[0].jetton_content.symbol is not None:
+            base_symbol = result[0].jetton_content.symbol
+    else:
+        base_symbol = "TON"
+    if result[1] is not None:
+        if result[1].jetton_content.symbol is not None:
+            quote_symbol = result[1].jetton_content.symbol
+    else:
+        quote_symbol = "TON"
+    return base_symbol, quote_symbol
+
+
 class TicTonAsyncClient:
     def __init__(
         self,
-        metadata: OracleMetadata,
+        metadata: OracleMetadataWithSymbols,
         toncenter: AsyncTonCenterClientV3,
         oracle_addr: AddressLike,
         mnemonics: Optional[str] = None,
@@ -150,8 +171,12 @@ class TicTonAsyncClient:
 
         metadata = await cls.get_oracle_metadata(toncenter, oracle_addr_str)
 
+        base_symbol, quote_symbol = await get_symbol_from_address(toncenter, metadata.base_asset_address, metadata.quote_asset_address)
+
+        new_metadata = OracleMetadataWithSymbols(**metadata.model_dump(), base_asset_symbol=base_symbol, quote_asset_symbol=quote_symbol)
+
         return cls(
-            metadata=metadata,
+            metadata=new_metadata,
             toncenter=toncenter,
             mnemonics=phrase,
             oracle_addr=oracle_addr_str,
