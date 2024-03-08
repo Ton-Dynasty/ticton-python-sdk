@@ -6,18 +6,7 @@ import time
 import warnings
 from decimal import Decimal
 from os import getenv
-from typing import (
-    Any,
-    Callable,
-    Coroutine,
-    List,
-    Literal,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-    overload,
-)
+from typing import Callable, List, Literal, Optional, Tuple, Type, Union, overload
 
 from pydantic import BaseModel, Field
 from pytoncenter import AsyncTonCenterClientV3, get_client
@@ -42,9 +31,6 @@ from tonsdk.utils import bytes_to_b64str
 
 from .arithmetic import FixedFloat, to_token, token_to_float
 from .callbacks import (
-    OnRingSuccessParams,
-    OnTickSuccessParams,
-    OnWindSuccessParams,
     handle_chime,
     handle_chronoshift,
     handle_noop,
@@ -809,9 +795,9 @@ class TicTonAsyncClient:
 
     async def subscribe(
         self,
-        on_tick_success: Callable[[TicTonAsyncClient, OnTickSuccessParams, Any], Coroutine[Any, Any, None]] = handle_noop,
-        on_wind_success: Callable[[TicTonAsyncClient, OnWindSuccessParams, Any], Coroutine[Any, Any, None]] = handle_noop,
-        on_ring_success: Callable[[TicTonAsyncClient, OnRingSuccessParams, Any], Coroutine[Any, Any, None]] = handle_noop,
+        on_tick_success: Callable = handle_noop,
+        on_wind_success: Callable = handle_noop,
+        on_ring_success: Callable = handle_noop,
         start_lt: Union[int, Literal["latest", "oldest"]] = "oldest",
         interval: Union[int, float] = 2.0,
         *,

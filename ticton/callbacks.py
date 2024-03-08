@@ -24,14 +24,16 @@ class OnTickSuccessParams(BaseModel):
 class OnWindSuccessParams(BaseModel):
     tx: Transaction
     timekeeper: AddressLike
-    alarm_id: int
-    new_base_asset_price: float
-    remain_scale: int
+    old_alarm_id: int
+    old_remain_scale: int
+    old_price: float
+    new_price: float
     new_alarm_id: int
+    new_remain_scale: int
     created_at: int
 
     def __str__(self):
-        return f"Wind success: new_alarm_id={self.new_alarm_id}, alarm_id={self.alarm_id}, timekeeper={self.timekeeper}, new_base_asset_price={self.new_base_asset_price}, remain_scale={self.remain_scale}, created_at={self.created_at}"
+        return f"Wind success: old_alarm_id={self.old_alarm_id}, new_alarm_id={self.new_alarm_id}, timekeeper={self.timekeeper}, old_price={self.old_price}, new_price={self.new_price}, old_remain_scale={self.old_remain_scale}, new_remain_scale={self.new_remain_scale}, created_at={self.created_at}"
 
 
 class OnRingSuccessParams(BaseModel):
@@ -140,16 +142,19 @@ async def handle_chime(
     if new_alarm_index is None:
         return
 
+    adjust_decimal = 10 ** (ticton_client.metadata.base_asset_decimals - ticton_client.metadata.quote_asset_decimals)
+
     return await on_wind_success(
         ticton_client,
         OnWindSuccessParams(
             tx=tx,
             timekeeper=tock_msg.watchmaker,  # type: ignore
-            alarm_id=wind_msg.alarm_index,
-            new_base_asset_price=float(FixedFloat(wind_msg.new_base_asset_price, skip_scale=True).to_float())
-            * 10 ** (ticton_client.metadata.base_asset_decimals - ticton_client.metadata.quote_asset_decimals),
-            remain_scale=wind_msg.remain_scale,
+            old_alarm_id=wind_msg.alarm_index,
             new_alarm_id=new_alarm_index,
+            old_price=float(FixedFloat(wind_msg.base_asset_price, skip_scale=True).to_float()) * adjust_decimal,
+            new_price=float(FixedFloat(wind_msg.new_base_asset_price, skip_scale=True).to_float()) * adjust_decimal,
+            old_remain_scale=wind_msg.remain_scale,
+            new_remain_scale=wind_msg.new_scale,
             created_at=tock_msg.created_at,
         ),
         **kwargs,
